@@ -337,7 +337,7 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
     model->nodes.push_back({});
     model->nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
     model->nodes[out->nodeIndex].name = getObjectName(obj);
-    getGLTFMatrix(obj, -1, model->nodes[out->nodeIndex].matrix);
+    getGLTFMatrix(obj, in->parentHandle, model->nodes[out->nodeIndex].matrix);
 
     if(isCompound(obj))
     {
@@ -346,6 +346,7 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
             exportShape_in args;
             args.handle = in->handle;
             args.shapeHandle = subObj;
+            args.parentHandle = obj;
             args.parentNodeIndex = out->nodeIndex;
             exportShape_out ret;
             exportShape(p, &args, &ret);
