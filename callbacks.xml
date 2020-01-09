@@ -94,11 +94,72 @@
             </param>
         </return>
     </command>
-    <command name="exportScene">
-        <description>Export scene content to glTF model.</description>
+    <command name="exportShape">
+        <description>Export shape to glTF model.</description>
         <params>
             <param name="handle" type="string">
                 <description>handle to the model</description>
+            </param>
+            <param name="shapeHandle" type="int">
+                <description>handle of the shape</description>
+            </param>
+            <param name="parentNodeIndex" type="int" default="0">
+                <description>index of parent node</description>
+            </param>
+        </params>
+        <return>
+            <param name="nodeIndex" type="int">
+                <description>index of the new node (may contain sub-nodes)</description>
+            </param>
+        </return>
+    </command>
+    <command name="exportObject">
+        <description>Export object to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+            <param name="objectHandle" type="int">
+                <description>handle of the object</description>
+            </param>
+        </params>
+            <param name="nodeIndex" type="int">
+                <description>index of the new node (may contain sub-nodes)</description>
+            </param>
+        <return>
+            <param name="nodeIndex" type="int">
+                <description>index of the new node (may contain sub-nodes)</description>
+            </param>
+        </return>
+    </command>
+    <command name="exportAllObjects">
+        <description>Export all objects to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
+    <command name="exportSelectedObjects">
+        <description>Export selected objects to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
+    <command name="exportObjects">
+        <description>Export objects to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+            <param name="objectHandles" type="table" item-type="int">
+                <description>handles of the objects</description>
             </param>
         </params>
         <return>

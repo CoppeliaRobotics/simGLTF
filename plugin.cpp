@@ -43,6 +43,25 @@ template<> std::string Handle<tinygltf::Model>::tag()
 void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 {
     tinygltf::Model *model = new tinygltf::Model;
+
+    model->asset.version = "2.0";
+    model->asset.generator = "CoppeliaSim glTF plugin";
+
+    model->samplers.push_back({});
+    model->samplers[0].magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+    model->samplers[0].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
+    model->samplers[0].wrapS = TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT;
+    model->samplers[0].wrapT = TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT;
+
+    model->nodes.push_back({});
+    model->nodes[0].name = "Root node";
+
+    model->scenes.push_back({});
+    model->scenes[0].name = "Default Scene";
+    model->scenes[0].nodes = {0};
+
+    model->defaultScene = 0;
+
     out->handle = Handle<tinygltf::Model>::str(model);
 }
 
@@ -293,6 +312,13 @@ std::vector<simInt> ungroupShape(simInt handle)
     return ret;
 }
 
+std::vector<simInt> ungroupShapeCopy(simInt handle)
+{
+    simInt handles[1] = {handle};
+    simCopyPasteObjects(handles, 1, 0);
+    return ungroupShape(handles[0]);
+}
+
 std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
 {
     std::vector<simFloat> ret;
@@ -301,84 +327,99 @@ std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
     return ret;
 }
 
-void exportScene(SScriptCallBack *p, const char *cmd, exportScene_in *in, exportScene_out *out)
+void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, exportShape_out *out)
 {
     tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
     if(!model) return;
 
-    model->asset.version = "2.0";
-    model->asset.generator = "CoppeliaSim glTF plugin";
-
-    model->samplers.push_back({});
-    model->samplers[0].magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-    model->samplers[0].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
-    model->samplers[0].wrapS = TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT;
-    model->samplers[0].wrapT = TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT;
-
-    std::vector<simInt> allObjects;
-    getObjectSelection(allObjects);
-    if(allObjects.empty())
-        getAllObjects(allObjects);
-
-    std::vector<simInt> allIndividualShapesToRemove;
-	simInt visibleLayers = getVisibleLayers();
-
+    simInt obj = in->shapeHandle;
+    out->nodeIndex = model->nodes.size();
     model->nodes.push_back({});
-    model->nodes[0].name = "Root node";
+    model->nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
+    model->nodes[out->nodeIndex].name = getObjectName(obj);
+    getGLTFMatrix(obj, -1, model->nodes[out->nodeIndex].matrix);
 
-    for(simInt obj : allObjects)
+    if(isCompound(obj))
     {
-		simInt objType = simGetObjectType(obj);
-		simInt layers = getObjectLayers(obj);
-        if(visibleLayers & layers)
+        for(simInt subObj : ungroupShapeCopy(obj))
         {
-            if(objType == sim_object_shape_type)
-            {
-                int i = model->nodes.size();
-                model->nodes.push_back({});
-                model->nodes[0].children.push_back(i);
-                model->nodes[i].name = getObjectName(obj);
-                getGLTFMatrix(obj, -1, model->nodes[i].matrix);
-                if(isCompound(obj))
-                {
-                    simInt objs[1] = {obj};
-                    simCopyPasteObjects(objs, 1, 0);
-                    std::vector<simInt> individualShapes = ungroupShape(objs[0]);
-                    for(simInt subObj : individualShapes)
-                    {
-                        allIndividualShapesToRemove.push_back(subObj);
-                        int j = model->nodes.size();
-                        model->nodes.push_back({});
-                        model->nodes[i].children.push_back(j);
-                        model->nodes[j].name = getObjectName(subObj);
-                        getGLTFMatrix(subObj, obj, model->nodes[j].matrix);
-                        std::vector<simFloat> col1 = getShapeColor(subObj, sim_colorcomponent_ambient_diffuse);
-                        std::vector<simFloat> col2 = getShapeColor(subObj, sim_colorcomponent_specular);
-                        std::string n = model->nodes[i].name + " -> " + model->nodes[j].name;
-                        model->nodes[j].mesh = addMesh(model, subObj, n);
-                        model->meshes[model->nodes[j].mesh].primitives[0].material = addBasicMaterial(model, col1, col2, n);
-                    }
-                }
-                else
-                {
-                    std::vector<simFloat> col1 = getShapeColor(obj, sim_colorcomponent_ambient_diffuse);
-                    std::vector<simFloat> col2 = getShapeColor(obj, sim_colorcomponent_specular);
-                    model->nodes[i].mesh = addMesh(model, obj, model->nodes[i].name);
-                    model->meshes[model->nodes[i].mesh].primitives[0].material = addBasicMaterial(model, col1, col2, model->nodes[i].name);
-                }
-            }
+            exportShape_in args;
+            args.handle = in->handle;
+            args.shapeHandle = subObj;
+            args.parentNodeIndex = out->nodeIndex;
+            exportShape_out ret;
+            exportShape(p, &args, &ret);
+            simRemoveObject(subObj);
         }
+        return;
     }
 
-    model->scenes.push_back({});
-    model->scenes[0].name = "Default Scene";
-    model->scenes[0].nodes = {0};
+    std::vector<simFloat> col1 = getShapeColor(obj, sim_colorcomponent_ambient_diffuse);
+    std::vector<simFloat> col2 = getShapeColor(obj, sim_colorcomponent_specular);
+    model->nodes[out->nodeIndex].mesh = addMesh(model, obj, model->nodes[out->nodeIndex].name);
+    model->meshes[model->nodes[out->nodeIndex].mesh].primitives[0].material = addBasicMaterial(model, col1, col2, model->nodes[out->nodeIndex].name);
+}
 
-    model->defaultScene = 0;
+void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, exportObject_out *out)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
+    if(!model) return;
 
-	for(simInt shape : allIndividualShapesToRemove)
+	simInt visibleLayers = getVisibleLayers();
+    simInt obj = in->objectHandle;
+    simInt layers = getObjectLayers(obj);
+    if(!(visibleLayers & layers)) return;
+
+    simInt objType = simGetObjectType(obj);
+    if(objType == sim_object_shape_type)
     {
-		simRemoveObject(shape);
+        exportShape_in args;
+        args.handle = in->handle;
+        args.shapeHandle = obj;
+        exportShape_out ret;
+        exportShape(p, &args, &ret);
+        out->nodeIndex = ret.nodeIndex;
+    }
+}
+
+void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *in, exportAllObjects_out *out)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
+    if(!model) return;
+
+    exportObjects_in args;
+    args.handle = in->handle;
+    getAllObjects(args.objectHandles);
+    if(args.objectHandles.empty()) return;
+    exportObjects_out ret;
+    exportObjects(p, &args, &ret);
+}
+
+void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedObjects_in *in, exportSelectedObjects_out *out)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
+    if(!model) return;
+
+    exportObjects_in args;
+    args.handle = in->handle;
+    getObjectSelection(args.objectHandles);
+    if(args.objectHandles.empty()) return;
+    exportObjects_out ret;
+    exportObjects(p, &args, &ret);
+}
+
+void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, exportObjects_out *out)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
+    if(!model) return;
+
+    exportObject_in args;
+    exportObject_out ret;
+    for(simInt obj : in->objectHandles)
+    {
+        args.handle = in->handle;
+        args.objectHandle = obj;
+        exportObject(p, &args, &ret);
     }
 }
 
