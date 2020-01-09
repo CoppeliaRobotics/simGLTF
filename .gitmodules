@@ -1,0 +1,4 @@
+[submodule "external/tinygltf"]
+	path = external/tinygltf
+	url = https://github.com/syoyo/tinygltf
+	branch = master

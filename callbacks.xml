@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<?xml-stylesheet type="text/xsl" href="callbacks.xsl"?>
+
+<plugin name="glTF" short-name="GLTF" author="federico.ferri.it@gmail.com">
+    <description>Plugin for glTF format support</description>
+    <command name="create">
+        <description>Create an empty glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
+        <params>
+        </params>
+        <return>
+            <param name="handle" type="string">
+                <description>a handle to the model</description>
+            </param>
+        </return>
+    </command>
+    <command name="destroy">
+        <description>Destroy an existing glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
+    <command name="loadASCII">
+        <description>Load an ASCII glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
+        <params>
+            <param name="filepath" type="string" />
+        </params>
+        <return>
+            <param name="handle" type="string">
+                <description>a handle to the model, or empty if error</description>
+            </param>
+            <param name="warnings" type="string">
+                <description>warning message(s)</description>
+            </param>
+            <param name="errors" type="string">
+                <description>error message(s)</description>
+            </param>
+        </return>
+    </command>
+    <command name="loadBinary">
+        <description>Load a binary (.glb) glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
+        <params>
+            <param name="filepath" type="string" />
+        </params>
+        <return>
+            <param name="handle" type="string">
+                <description>a handle to the model, or empty if error</description>
+            </param>
+            <param name="warnings" type="string">
+                <description>warning message(s)</description>
+            </param>
+            <param name="errors" type="string">
+                <description>error message(s)</description>
+            </param>
+        </return>
+    </command>
+    <command name="saveASCII">
+        <description>Save a glTF model to an ASCII file.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+            <param name="filepath" type="string" />
+        </params>
+        <return>
+            <param name="success" type="bool" />
+        </return>
+    </command>
+    <command name="saveBinary">
+        <description>Save a glTF model to a binary file.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+            <param name="filepath" type="string" />
+        </params>
+        <return>
+            <param name="success" type="bool" />
+        </return>
+    </command>
+    <command name="serialize">
+        <description>Serialize glTF model to JSON string.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+            <param name="json" type="string">
+                <description>the JSON document</description>
+            </param>
+        </return>
+    </command>
+    <command name="exportScene">
+        <description>Export scene content to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
+</plugin>
