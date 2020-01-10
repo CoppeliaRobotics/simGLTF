@@ -42,9 +42,9 @@ struct simAnimFrame
     simFloat time;
     std::vector<simPose3D> poses;
 
-    void read(const std::vector<int> &handles)
+    void read(simFloat time, const std::vector<int> &handles)
     {
-        time = simGetSimulationTime();
+        this->time = time;
         poses.resize(handles.size());
         size_t i = 0;
         for(const auto &handle : handles)
@@ -549,8 +549,15 @@ void initAnimationFrames()
 
 void readAnimationFrame()
 {
+    if(simGetSimulationState() != sim_simulation_advancing_running)
+        return;
+
+    simFloat t = simGetSimulationTime();
+    if(!frames.empty() && t < frames.back().time + 0.001)
+        return;
+
     frames.push_back({});
-    frames.back().read(handles);
+    frames.back().read(t, handles);
 }
 
 class Plugin : public sim::Plugin
