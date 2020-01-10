@@ -410,10 +410,10 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
 	simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
     simInt layers = getObjectLayers(obj);
-    if(!(visibleLayers & layers)) return;
+    bool visible = visibleLayers & layers;
 
     simInt objType = simGetObjectType(obj);
-    if(objType == sim_object_shape_type)
+    if(objType == sim_object_shape_type && visible)
     {
         exportShape_in args;
         args.handle = in->handle;
@@ -422,6 +422,26 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         exportShape(p, &args, &ret);
         out->nodeIndex = ret.nodeIndex;
         nodeIndex[obj] = ret.nodeIndex;
+    }
+    if(objType == sim_object_camera_type)
+    {
+        int cameraIndex = model->cameras.size();
+        model->cameras.push_back({});
+        model->cameras.back().type = "perspective";
+        model->cameras.back().perspective.aspectRatio = 16/9.;
+        simFloat a;
+        if(simGetObjectFloatParameter(obj, sim_camerafloatparam_perspective_angle, &a) == 1)
+            model->cameras.back().perspective.yfov = a;
+        model->cameras.back().perspective.znear = 0.001;
+        model->cameras.back().perspective.zfar = 1000;
+        out->nodeIndex = model->nodes.size();
+        model->nodes.push_back({});
+        model->nodes[out->nodeIndex].camera = cameraIndex;
+        model->nodes[out->nodeIndex].name = getObjectName(obj);
+        getGLTFMatrix(obj, -1, model->nodes[out->nodeIndex].matrix);
+    }
+    if(objType == sim_object_light_type)
+    {
     }
 }
 
