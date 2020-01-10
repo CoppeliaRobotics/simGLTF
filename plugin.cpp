@@ -173,6 +173,15 @@ void minMax(const T *v, simInt size, simInt offset, simInt step, double &min, do
 }
 
 template<typename T>
+void minMaxVec(const T *v, simInt size, simInt step, std::vector<double> &min, std::vector<double> &max)
+{
+    min.resize(step);
+    max.resize(step);
+    for(int i = 0; i < step; i++)
+        minMax(v, size, i, step, min[i], max[i]);
+}
+
+template<typename T>
 void releaseBuffer(const T *b)
 {
     simReleaseBuffer(reinterpret_cast<const char *>(b));
@@ -235,14 +244,11 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int vi = addBufferView(model, bi, sizeof(simInt) * indicesSize, 0, name + " index");
     //int vn = addBufferView(model, bv, sizeof(simFloat) * indicesSize * 3, 0, name + " normal");
 
-    double vxmin, vxmax, vymin, vymax, vzmin, vzmax;
-    minMax<simFloat>(vertices, verticesSize, 0, 3, vxmin, vxmax);
-    minMax<simFloat>(vertices, verticesSize, 1, 3, vymin, vymax);
-    minMax<simFloat>(vertices, verticesSize, 2, 3, vzmin, vzmax);
-    int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, verticesSize / 3, {vxmin, vymin, vzmin}, {vxmax, vymax, vzmax}, name + " vertex");
-    double imin, imax;
-    minMax<simInt>(indices, indicesSize, 0, 1, imin, imax);
-    int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indicesSize, {double(imin)}, {double(imax)}, name + " index");
+    std::vector<double> vmin, vmax, imin, imax;
+    minMaxVec(vertices, verticesSize, 3, vmin, vmax);
+    int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, verticesSize / 3, vmin, vmax, name + " vertex");
+    minMaxVec(indices, indicesSize, 1, imin, imax);
+    int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indicesSize, imin, imax, name + " index");
 
     int i = model->meshes.size();
     model->meshes.push_back({});
@@ -475,9 +481,9 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
     for(int i = 0; i < n; i++) t[i] = frames[i].time;
     int bt = addBuffer(model, t, sizeof(simFloat) * n, "time");
     int vt = addBufferView(model, bt, sizeof(simFloat) * n, 0, "time");
-    double tmin, tmax;
-    minMax<simFloat>(t, n, 0, 1, tmin, tmax);
-    int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, {tmin}, {tmax}, "time");
+    std::vector<double> tmin, tmax;
+    minMaxVec(t, n, 1, tmin, tmax);
+    int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
     for(simInt handle : handles)
     {
@@ -506,20 +512,13 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         int bp = addBuffer(model, p, sizeof(simFloat) * n * 3, name + " position");
         int vp = addBufferView(model, bp, sizeof(simFloat) * n * 3, 0, name + " position");
         std::vector<double> pmin, pmax;
-        pmin.resize(3); pmax.resize(3);
-        minMax<simFloat>(p, n * 3, 0, 3, pmin[0], pmax[0]);
-        minMax<simFloat>(p, n * 3, 1, 3, pmin[1], pmax[1]);
-        minMax<simFloat>(p, n * 3, 2, 3, pmin[2], pmax[2]);
+        minMaxVec(p, n * 3, 3, pmin, pmax);
         int ap = addAccessor(model, vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
         int br = addBuffer(model, r, sizeof(simFloat) * n * 4, name + " rotation");
         int vr = addBufferView(model, br, sizeof(simFloat) * n * 4, 0, name + " rotation");
         std::vector<double> rmin, rmax;
-        rmin.resize(4); rmax.resize(4);
-        minMax<simFloat>(r, n * 4, 0, 4, rmin[0], rmax[0]);
-        minMax<simFloat>(r, n * 4, 1, 4, rmin[1], rmax[1]);
-        minMax<simFloat>(r, n * 4, 2, 4, rmin[2], rmax[2]);
-        minMax<simFloat>(r, n * 4, 3, 4, rmin[3], rmax[3]);
+        minMaxVec(r, n * 4, 4, rmin, rmax);
         int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
         // create samplers & channels:
