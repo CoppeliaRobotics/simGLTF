@@ -128,7 +128,7 @@ bool getGLTFMatrix(int handle, int relTo, std::vector<double> &m)
 }
 
 template<typename T>
-void minMax(const T *v, simInt size, simInt offset, simInt step, T &min, T &max)
+void minMax(const T *v, simInt size, simInt offset, simInt step, double &min, double &max)
 {
     for(int i = offset; i < size; i += step)
     {
@@ -200,12 +200,12 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int vi = addBufferView(model, bi, sizeof(simInt) * indicesSize, 0, name + " index");
     //int vn = addBufferView(model, bv, sizeof(simFloat) * indicesSize * 3, 0, name + " normal");
 
-    simFloat vxmin, vxmax, vymin, vymax, vzmin, vzmax;
+    double vxmin, vxmax, vymin, vymax, vzmin, vzmax;
     minMax<simFloat>(vertices, verticesSize, 0, 3, vxmin, vxmax);
     minMax<simFloat>(vertices, verticesSize, 1, 3, vymin, vymax);
     minMax<simFloat>(vertices, verticesSize, 2, 3, vzmin, vzmax);
     int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, verticesSize / 3, {vxmin, vymin, vzmin}, {vxmax, vymax, vzmax}, name + " vertex");
-    simInt imin, imax;
+    double imin, imax;
     minMax<simInt>(indices, indicesSize, 0, 1, imin, imax);
     int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indicesSize, {double(imin)}, {double(imax)}, name + " index");
 
