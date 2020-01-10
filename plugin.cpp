@@ -23,6 +23,41 @@ tinygltf::TinyGLTF gltf;
 
 using sim::Handle;
 
+struct simPose3D
+{
+    simInt handle;
+    simFloat position[3];
+    simFloat orientation[4];
+
+    void get(int handle, int relTo)
+    {
+        this->handle = handle;
+        simGetObjectPosition(handle, relTo, &position[0]);
+        simGetObjectQuaternion(handle, relTo, &orientation[0]);
+    }
+};
+
+struct simAnimFrame
+{
+    simFloat time;
+    std::vector<simPose3D> poses;
+
+    void read(const std::vector<int> &handles)
+    {
+        time = simGetSimulationTime();
+        poses.resize(handles.size());
+        size_t i = 0;
+        for(const auto &handle : handles)
+            poses[i++].get(handle, -1);
+    }
+};
+
+// for animation data:
+std::vector<int> handles;
+std::map<int, size_t> handleIndex;
+std::vector<simAnimFrame> frames;
+std::map<int, size_t> nodeIndex;
+
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
 {
@@ -380,6 +415,7 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         exportShape_out ret;
         exportShape(p, &args, &ret);
         out->nodeIndex = ret.nodeIndex;
+        nodeIndex[obj] = ret.nodeIndex;
     }
 }
 
@@ -394,6 +430,8 @@ void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *
     if(args.objectHandles.empty()) return;
     exportObjects_out ret;
     exportObjects(p, &args, &ret);
+
+    exportAnimation(p, in->handle);
 }
 
 void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedObjects_in *in, exportSelectedObjects_out *out)
@@ -424,6 +462,98 @@ void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, ex
     }
 }
 
+void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in, exportAnimation_out *out)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
+    if(!model) return;
+
+    model->animations.resize(1);
+
+    // create time buffer:
+    int n = frames.size();
+    simFloat t[n];
+    for(int i = 0; i < n; i++) t[i] = frames[i].time;
+    int bt = addBuffer(model, t, sizeof(simFloat) * n, "time");
+    int vt = addBufferView(model, bt, sizeof(simFloat) * n, 0, "time");
+    double tmin, tmax;
+    minMax<simFloat>(t, n, 0, 1, tmin, tmax);
+    int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, {tmin}, {tmax}, "time");
+
+    for(simInt handle : handles)
+    {
+        if(nodeIndex.find(handle) == nodeIndex.end()) continue;
+
+        // for each object we need two channels: translation and rotation
+        int ip = model->animations[0].channels.size();
+        model->animations[0].channels.push_back({});
+        model->animations[0].samplers.push_back({});
+        int ir = model->animations[0].channels.size();
+        model->animations[0].channels.push_back({});
+        model->animations[0].samplers.push_back({});
+
+        // create translation and rotation buffers:
+        std::string name = getObjectName(handle);
+        simFloat p[n * 3], r[n * 4];
+        int hi = handleIndex[handle];
+        for(int i = 0; i < n; i++)
+        {
+            for(int j = 0; j < 3; j++)
+                p[3 * i + j] = frames[i].poses[hi].position[j];
+            for(int j = 0; j < 4; j++)
+                r[4 * i + j] = frames[i].poses[hi].orientation[j];
+        }
+
+        int bp = addBuffer(model, p, sizeof(simFloat) * n * 3, name + " position");
+        int vp = addBufferView(model, bp, sizeof(simFloat) * n * 3, 0, name + " position");
+        std::vector<double> pmin, pmax;
+        pmin.resize(3); pmax.resize(3);
+        minMax<simFloat>(p, n * 3, 0, 3, pmin[0], pmax[0]);
+        minMax<simFloat>(p, n * 3, 1, 3, pmin[1], pmax[1]);
+        minMax<simFloat>(p, n * 3, 2, 3, pmin[2], pmax[2]);
+        int ap = addAccessor(model, vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
+
+        int br = addBuffer(model, r, sizeof(simFloat) * n * 4, name + " rotation");
+        int vr = addBufferView(model, br, sizeof(simFloat) * n * 4, 0, name + " rotation");
+        std::vector<double> rmin, rmax;
+        rmin.resize(4); rmax.resize(4);
+        minMax<simFloat>(r, n * 4, 0, 4, rmin[0], rmax[0]);
+        minMax<simFloat>(r, n * 4, 1, 4, rmin[1], rmax[1]);
+        minMax<simFloat>(r, n * 4, 2, 4, rmin[2], rmax[2]);
+        minMax<simFloat>(r, n * 4, 3, 4, rmin[3], rmax[3]);
+        int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
+
+        // create samplers & channels:
+        model->animations[0].samplers[ip].interpolation = "STEP";
+        model->animations[0].samplers[ip].input = at;
+        model->animations[0].samplers[ip].output = ap;
+        model->animations[0].channels[ip].sampler = ip;
+        model->animations[0].channels[ip].target_node = nodeIndex[handle];
+        model->animations[0].channels[ip].target_path = "translation";
+        model->animations[0].samplers[ir].interpolation = "STEP";
+        model->animations[0].samplers[ir].input = at;
+        model->animations[0].samplers[ir].output = ar;
+        model->animations[0].channels[ir].sampler = ir;
+        model->animations[0].channels[ir].target_node = nodeIndex[handle];
+        model->animations[0].channels[ir].target_path = "rotation";
+    }
+}
+
+void initAnimationFrames()
+{
+    handles.clear();
+    handleIndex.clear();
+    frames.clear();
+    getAllObjects(handles);
+    for(int i = 0; i < handles.size(); i++)
+        handleIndex[handles[i]] = i;
+}
+
+void readAnimationFrame()
+{
+    frames.push_back({});
+    frames.back().read(handles);
+}
+
 class Plugin : public sim::Plugin
 {
 public:
@@ -434,6 +564,16 @@ public:
 
         simSetModuleInfo(PLUGIN_NAME, 0, "glTF support", 0);
         simSetModuleInfo(PLUGIN_NAME, 1, BUILD_DATE, 0);
+    }
+
+    void onSimulationAboutToStart()
+    {
+        initAnimationFrames();
+    }
+
+    void onInstancePass(const sim::InstancePassFlags &flags)
+    {
+        readAnimationFrame();
     }
 };
 

@@ -168,4 +168,14 @@
         <return>
         </return>
     </command>
+    <command name="exportAnimation">
+        <description>Export animation data to glTF model.</description>
+        <params>
+            <param name="handle" type="string">
+                <description>handle to the model</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
 </plugin>
