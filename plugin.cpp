@@ -90,6 +90,12 @@ void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 
     model->nodes.push_back({});
     model->nodes[0].name = "Root node";
+    model->nodes[0].matrix = {
+        1, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 1, 0, 0,
+        0, 0, 0, 1
+    };
 
     model->scenes.push_back({});
     model->scenes[0].name = "Default Scene";
