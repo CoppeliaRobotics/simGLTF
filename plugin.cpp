@@ -75,6 +75,13 @@ template<> std::string Handle<tinygltf::Model>::tag()
     return PLUGIN_NAME ".model";
 }
 
+tinygltf::Model * getModel(const std::string &handle)
+{
+    tinygltf::Model *model = Handle<tinygltf::Model>::obj(handle);
+    if(!model) throw std::runtime_error("invalid glTF model handle");
+    return model;
+}
+
 void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 {
     tinygltf::Model *model = new tinygltf::Model;
@@ -108,8 +115,7 @@ void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 
 void destroy(SScriptCallBack *p, const char *cmd, destroy_in *in, destroy_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
+    auto model = getModel(in->handle);
     delete model;
 }
 
@@ -133,22 +139,19 @@ void loadBinary(SScriptCallBack *p, const char *cmd, loadBinary_in *in, loadBina
 
 void saveASCII(SScriptCallBack *p, const char *cmd, saveASCII_in *in, saveASCII_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
+    auto model = getModel(in->handle);
     out->success = gltf.WriteGltfSceneToFile(model, in->filepath, true, true, true, false);
 }
 
 void saveBinary(SScriptCallBack *p, const char *cmd, saveBinary_in *in, saveBinary_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
+    auto model = getModel(in->handle);
     out->success = gltf.WriteGltfSceneToFile(model, in->filepath, true, true, true, true);
 }
 
 void serialize(SScriptCallBack *p, const char *cmd, serialize_in *in, serialize_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
+    auto model = getModel(in->handle);
     std::stringstream ss;
     gltf.WriteGltfSceneToStream(model, ss, true, false);
     out->json = ss.str();
@@ -376,9 +379,7 @@ std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
 
 void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, exportShape_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
-
+    auto model = getModel(in->handle);
     simInt obj = in->shapeHandle;
     out->nodeIndex = model->nodes.size();
     model->nodes.push_back({});
@@ -410,9 +411,7 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
 
 void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, exportObject_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
-
+    auto model = getModel(in->handle);
 	simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
     simInt layers = getObjectLayers(obj);
@@ -453,9 +452,7 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
 
 void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *in, exportAllObjects_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
-
+    auto model = getModel(in->handle);
     exportObjects_in args;
     args.handle = in->handle;
     getAllObjects(args.objectHandles);
@@ -466,9 +463,7 @@ void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *
 
 void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedObjects_in *in, exportSelectedObjects_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
-
+    auto model = getModel(in->handle);
     exportObjects_in args;
     args.handle = in->handle;
     getObjectSelection(args.objectHandles);
@@ -479,9 +474,7 @@ void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedOb
 
 void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, exportObjects_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
-
+    auto model = getModel(in->handle);
     exportObject_in args;
     exportObject_out ret;
     for(simInt obj : in->objectHandles)
@@ -494,8 +487,7 @@ void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, ex
 
 void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in, exportAnimation_out *out)
 {
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(in->handle);
-    if(!model) return;
+    auto model = getModel(in->handle);
 
     model->animations.resize(1);
 
