@@ -417,7 +417,7 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
 void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, exportObject_out *out)
 {
     auto model = getModel(in->handle);
-	simInt visibleLayers = getVisibleLayers();
+    simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
     simInt layers = getObjectLayers(obj);
     bool visible = visibleLayers & layers;
