@@ -82,6 +82,13 @@ tinygltf::Model * getModel(const std::string &handle)
     return model;
 }
 
+void reportError(const std::string &message)
+{
+    std::string m = "glTF: " + message;
+    simAddStatusbarMessage(m.c_str());
+    std::cerr << m << std::endl;
+}
+
 void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 {
     tinygltf::Model *model = new tinygltf::Model;
@@ -296,18 +303,6 @@ void getObjectSelection(std::vector<simInt> &v)
     simGetObjectSelection(v.data());
 }
 
-void getAllObjects(std::vector<simInt> &v)
-{
-    simInt allObjectsCount;
-    simInt *allObjectsBuf = simGetObjectsInTree(sim_handle_scene, sim_handle_all, 0, &allObjectsCount);
-    if(allObjectsBuf)
-    {
-        for(int i = 0; i < allObjectsCount; i++)
-            v.push_back(allObjectsBuf[i]);
-        releaseBuffer(allObjectsBuf);
-    }
-}
-
 simInt getVisibleLayers()
 {
     simInt v = 0;
@@ -338,13 +333,23 @@ simInt getObjectLayers(simInt handle)
         return 0;
 }
 
-bool isCompound(simInt handle)
+bool is(simInt handle, simInt param)
 {
     simInt v = 0;
-    if(simGetObjectInt32Parameter(handle, sim_shapeintparam_compound, &v) == 1)
+    if(simGetObjectInt32Parameter(handle, param, &v) == 1)
         return v != 0;
     else
         return false;
+}
+
+bool isCompound(simInt handle)
+{
+    return is(handle, sim_shapeintparam_compound);
+}
+
+bool isWireframe(simInt handle)
+{
+    return is(handle, sim_shapeintparam_wireframe);
 }
 
 std::vector<simInt> ungroupShape(simInt handle)
@@ -426,7 +431,6 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         exportShape_out ret;
         exportShape(p, &args, &ret);
         out->nodeIndex = ret.nodeIndex;
-        nodeIndex[obj] = ret.nodeIndex;
     }
     if(objType == sim_object_camera_type)
     {
@@ -445,8 +449,28 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         model->nodes[out->nodeIndex].name = getObjectName(obj);
         getGLTFMatrix(obj, -1, model->nodes[out->nodeIndex].matrix);
     }
-    if(objType == sim_object_light_type)
+
+    nodeIndex[obj] = out->nodeIndex;
+}
+
+void getAllObjects(std::vector<simInt> &v)
+{
+    simInt allObjectsCount;
+    simInt *allObjectsBuf = simGetObjectsInTree(sim_handle_scene, sim_handle_all, 0, &allObjectsCount);
+    if(allObjectsBuf)
     {
+        for(int i = 0; i < allObjectsCount; i++)
+        {
+            simInt obj = allObjectsBuf[i];
+            simInt objType = simGetObjectType(obj);
+            simInt visibleLayers = getVisibleLayers();
+            simInt layers = getObjectLayers(obj);
+            bool visible = visibleLayers & layers;
+            if((objType == sim_object_shape_type && visible && !isWireframe(obj))
+                    || objType == sim_object_camera_type)
+                v.push_back(obj);
+        }
+        releaseBuffer(allObjectsBuf);
     }
 }
 
@@ -503,7 +527,11 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
 
     for(simInt handle : handles)
     {
-        if(nodeIndex.find(handle) == nodeIndex.end()) continue;
+        if(nodeIndex.find(handle) == nodeIndex.end())
+        {
+            reportError((boost::format("Object with handle %d (%s) has no corresponding node") % handle % getObjectName(handle)).str());
+            continue;
+        }
 
         // for each object we need two channels: translation and rotation
         int ip = model->animations[0].channels.size();
