@@ -462,8 +462,6 @@ void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *
     if(args.objectHandles.empty()) return;
     exportObjects_out ret;
     exportObjects(p, &args, &ret);
-
-    exportAnimation(p, in->handle);
 }
 
 void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedObjects_in *in, exportSelectedObjects_out *out)
