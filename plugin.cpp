@@ -252,21 +252,56 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     if(simGetShapeMesh(handle, &vertices, &verticesSize, &indices, &indicesSize, &normals) == -1)
         return -1;
 
-    int bv = addBuffer(model, vertices, sizeof(simFloat) * verticesSize, name + " vertex");
-    int bi = addBuffer(model, indices, sizeof(simInt) * indicesSize, name + " index");
-    int bn = addBuffer(model, normals, sizeof(simFloat) * indicesSize * 3, name + " normal");
+    std::vector<simFloat> vertices2;
+    std::vector<simInt> indices2;
+    std::vector<simFloat> normals2;
+    for(int i = 0; i < indicesSize; i += 3)
+    {
+        int i0 = indices[i+0];
+        int i1 = indices[i+1];
+        int i2 = indices[i+2];
+        vertices2.push_back(vertices[3*i0+0]);
+        vertices2.push_back(vertices[3*i0+1]);
+        vertices2.push_back(vertices[3*i0+2]);
+        vertices2.push_back(vertices[3*i1+0]);
+        vertices2.push_back(vertices[3*i1+1]);
+        vertices2.push_back(vertices[3*i1+2]);
+        vertices2.push_back(vertices[3*i2+0]);
+        vertices2.push_back(vertices[3*i2+1]);
+        vertices2.push_back(vertices[3*i2+2]);
+        indices2.push_back(i+0);
+        indices2.push_back(i+1);
+        indices2.push_back(i+2);
+        normals2.push_back(normals[3*i+0]);
+        normals2.push_back(normals[3*i+1]);
+        normals2.push_back(normals[3*i+2]);
+        normals2.push_back(normals[3*i+3]);
+        normals2.push_back(normals[3*i+4]);
+        normals2.push_back(normals[3*i+5]);
+        normals2.push_back(normals[3*i+6]);
+        normals2.push_back(normals[3*i+7]);
+        normals2.push_back(normals[3*i+8]);
+    }
 
-    int vv = addBufferView(model, bv, sizeof(simFloat) * verticesSize, 0, name + " vertex");
-    int vi = addBufferView(model, bi, sizeof(simInt) * indicesSize, 0, name + " index");
-    int vn = addBufferView(model, bn, sizeof(simFloat) * indicesSize * 3, 0, name + " normal");
+    releaseBuffer(vertices);
+    releaseBuffer(indices);
+    releaseBuffer(normals);
+
+    int bv = addBuffer(model, vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
+    int bi = addBuffer(model, indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
+    int bn = addBuffer(model, normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
+
+    int vv = addBufferView(model, bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
+    int vi = addBufferView(model, bi, sizeof(simInt) * indices2.size(), 0, name + " index");
+    int vn = addBufferView(model, bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
 
     std::vector<double> vmin, vmax, imin, imax, nmin, nmax;
-    minMaxVec(vertices, verticesSize, 3, vmin, vmax);
-    int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, verticesSize / 3, vmin, vmax, name + " vertex");
-    minMaxVec(indices, indicesSize, 1, imin, imax);
-    int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indicesSize, imin, imax, name + " index");
-    minMaxVec(normals, indicesSize * 3, 3, nmin, nmax);
-    int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, indicesSize, nmin, nmax, name + " normal");
+    minMaxVec(vertices2.data(), vertices2.size(), 3, vmin, vmax);
+    int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
+    minMaxVec(indices2.data(), indices2.size(), 1, imin, imax);
+    int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
+    minMaxVec(normals2.data(), normals2.size(), 3, nmin, nmax);
+    int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
 
     int i = model->meshes.size();
     model->meshes.push_back({});
