@@ -254,17 +254,19 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
 
     int bv = addBuffer(model, vertices, sizeof(simFloat) * verticesSize, name + " vertex");
     int bi = addBuffer(model, indices, sizeof(simInt) * indicesSize, name + " index");
-    //int bn = addBuffer(model, normals, sizeof(simFloat) * indicesSize * 3, name + " normal");
+    int bn = addBuffer(model, normals, sizeof(simFloat) * indicesSize * 3, name + " normal");
 
     int vv = addBufferView(model, bv, sizeof(simFloat) * verticesSize, 0, name + " vertex");
     int vi = addBufferView(model, bi, sizeof(simInt) * indicesSize, 0, name + " index");
-    //int vn = addBufferView(model, bv, sizeof(simFloat) * indicesSize * 3, 0, name + " normal");
+    int vn = addBufferView(model, bn, sizeof(simFloat) * indicesSize * 3, 0, name + " normal");
 
-    std::vector<double> vmin, vmax, imin, imax;
+    std::vector<double> vmin, vmax, imin, imax, nmin, nmax;
     minMaxVec(vertices, verticesSize, 3, vmin, vmax);
     int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, verticesSize / 3, vmin, vmax, name + " vertex");
     minMaxVec(indices, indicesSize, 1, imin, imax);
     int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indicesSize, imin, imax, name + " index");
+    minMaxVec(normals, indicesSize * 3, 3, nmin, nmax);
+    int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, indicesSize, nmin, nmax, name + " normal");
 
     int i = model->meshes.size();
     model->meshes.push_back({});
@@ -272,6 +274,7 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     mesh.name = name + " mesh";
     mesh.primitives.push_back({});
     mesh.primitives[0].attributes["POSITION"] = av;
+    mesh.primitives[0].attributes["NORMAL"] = an;
     mesh.primitives[0].indices = ai;
     mesh.primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
     return i;
