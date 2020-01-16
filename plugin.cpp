@@ -266,7 +266,7 @@ std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2])
     infoHeader[14] = (unsigned char)(bytesPerPixel * 8);
     unsigned char *imageData = infoHeader + 40;
     unsigned char padding[3] = {0, 0, 0};
-    for(int i = 0, j = 40 + 14; i < height; i++)
+    for(int i = 0; i < height; i++)
     {
         std::memcpy(imageData, data, bytesPerPixel * width);
         imageData += width * bytesPerPixel;
