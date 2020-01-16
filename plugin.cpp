@@ -290,15 +290,8 @@ int addImage(tinygltf::Model *model, simInt id, void *imgdata, int res[2])
 
     int i = model->images.size();
     model->images.push_back({});
-    //model->images[i].width = res[0];
-    //model->images[i].height = res[1];
-    //model->images[i].component = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE; // ???
-    //model->images[i].bits = 8; // 8 bits per channel
-    //model->images[i].pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
     model->images[i].bufferView = v;
     model->images[i].mimeType = "image/bmp";
-    //model->images[i].image = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res);
-    //model->images[i].uri = "";
     model->images[i].name = name;
     textureMap[id] = i;
     return i;
