@@ -178,4 +178,14 @@
         <return>
         </return>
     </command>
+    <command name="animationFrameCount">
+        <description>Return count of animation frames.</description>
+        <params>
+        </params>
+        <return>
+            <param name="count" type="int">
+                <description>count of frames</description>
+            </param>
+        </return>
+    </command>
 </plugin>

@@ -702,6 +702,11 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
     }
 }
 
+void animationFrameCount(SScriptCallBack *p, const char *cmd, animationFrameCount_in *in, animationFrameCount_out *out)
+{
+    out->count = frames.size();
+}
+
 void initAnimationFrames()
 {
     handles.clear();
