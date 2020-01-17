@@ -265,13 +265,21 @@ std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2])
     infoHeader[12] = (unsigned char)(1);
     infoHeader[14] = (unsigned char)(bytesPerPixel * 8);
     unsigned char *imageData = infoHeader + 40;
-    unsigned char padding[3] = {0, 0, 0};
-    for(int i = 0; i < height; i++)
+    unsigned char byteOrder[4] = {2, 1, 0, 3};
+    for(int i = height - 1; i >= 0; i--)
     {
-        std::memcpy(imageData, data, bytesPerPixel * width);
-        imageData += width * bytesPerPixel;
-        data += width * bytesPerPixel;
-        std::memcpy(imageData, &padding[0], paddingSize);
+        for(int j = 0; j < width * bytesPerPixel; j += bytesPerPixel)
+        {
+            for(int k = 0; k < 4; k++)
+            {
+                imageData[k] = data[i * (width * bytesPerPixel + paddingSize) + j + byteOrder[k]];
+            }
+            imageData += 4;
+        }
+        for(int j = 0; j < paddingSize; j++)
+        {
+            imageData[j] = 0;
+        }
         imageData += paddingSize;
     }
     return buf;
