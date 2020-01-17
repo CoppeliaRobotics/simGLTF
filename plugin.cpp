@@ -346,9 +346,9 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     releaseBuffer(info.indices);
     releaseBuffer(info.normals);
 
-    std::vector<simFloat> col1(&info.colors[0], &info.colors[0] + 3); // ambient-diffuse
-    std::vector<simFloat> col2(&info.colors[3], &info.colors[3] + 3); // specular
-    std::vector<simFloat> col3(&info.colors[6], &info.colors[6] + 3); // emission
+    std::vector<simFloat> diffuse(&info.colors[0], &info.colors[0] + 3);
+    std::vector<simFloat> specular(&info.colors[3], &info.colors[3] + 3);
+    std::vector<simFloat> emission(&info.colors[6], &info.colors[6] + 3);
 
     int bv = addBuffer(model, vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
     int bi = addBuffer(model, indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
@@ -382,7 +382,7 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     model->meshes[i].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
 
     int colorKey = 0;
-    for(int i = 0; i < col1.size(); i++) colorKey = colorKey * 100 + int(fmax(0.0, fmin(1.0, col1[i])) * 99);
+    for(int i = 0; i < diffuse.size(); i++) colorKey = colorKey * 100 + int(fmax(0.0, fmin(1.0, diffuse[i])) * 99);
     if(!hasTexture && materialMap.find(colorKey) != materialMap.end())
         model->meshes[i].primitives[0].material = materialMap[colorKey];
     else
@@ -391,7 +391,8 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
         model->meshes[i].primitives[0].material = mat;
         model->materials.push_back({});
         model->materials[mat].name = name + " material";
-        model->materials[mat].pbrMetallicRoughness.baseColorFactor = {col1[0], col1[1], col1[2], 1.0};
+        model->materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
+        model->materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
         model->materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
         if(hasTexture)
