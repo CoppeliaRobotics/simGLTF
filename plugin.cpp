@@ -393,20 +393,20 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
             releaseBuffer(info.texture);
             model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
             model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = model->textures.size();
-            model->textures.push_back({});
-            tinygltf::Texture &texture = model->textures.back();
-            texture.name = name + " texture";
-            int sampler = model->samplers.size();
             bool repU = info.textureOptions & 1;
             bool repV = info.textureOptions & 2;
             bool interp = info.textureOptions & 4;
+            int sampler = model->samplers.size();
             model->samplers.push_back({});
             model->samplers[sampler].magFilter = interp ? TINYGLTF_TEXTURE_FILTER_LINEAR : TINYGLTF_TEXTURE_FILTER_NEAREST;
             model->samplers[sampler].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
             model->samplers[sampler].wrapS = repU ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
             model->samplers[sampler].wrapT = repV ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
-            texture.sampler = sampler;
-            texture.source = addImage(model, info.textureId, info.texture, info.textureRes);
+            int tex = model->textures.size();
+            model->textures.push_back({});
+            model->textures[tex].name = name + " texture";
+            model->textures[tex].sampler = sampler;
+            model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes);
         }
         materialMap[colorKey] = mat;
     }
