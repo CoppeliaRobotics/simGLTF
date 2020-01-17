@@ -354,12 +354,12 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int bv = addBuffer(model, vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
     int bi = addBuffer(model, indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
     int bn = addBuffer(model, normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
-    int bt = hasTexture ? addBuffer(model, texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " tex coord") : -1;
+    int bt = hasTexture ? addBuffer(model, texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord") : -1;
 
     int vv = addBufferView(model, bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
     int vi = addBufferView(model, bi, sizeof(simInt) * indices2.size(), 0, name + " index");
     int vn = addBufferView(model, bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
-    int vt = hasTexture ? addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " tex coord") : -1;
+    int vt = hasTexture ? addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord") : -1;
 
     std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
     minMaxVec(vertices2.data(), vertices2.size(), 3, vmin, vmax);
@@ -369,7 +369,7 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     minMaxVec(normals2.data(), normals2.size(), 3, nmin, nmax);
     int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
     if(hasTexture) minMaxVec(texCoords2.data(), texCoords2.size(), 2, tmin, tmax);
-    int at = hasTexture ? addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " tex coord") : -1;
+    int at = hasTexture ? addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord") : -1;
 
     int i = model->meshes.size();
     model->meshes.push_back({});
