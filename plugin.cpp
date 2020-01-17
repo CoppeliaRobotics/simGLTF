@@ -325,9 +325,8 @@ void expandVertices(simFloat *vertices, simInt verticesSize, simInt *indices, si
         for(int j = 0; j < 9; j++)
             normals2[in++] = normals[3*i+j];
         if(texCoords)
-            for(int j = 0; j < 3; j++)
-                for(int k = 0; k < 2; k++)
-                    texCoords2[it++] = texCoords[2*indices[i+j]+k];
+            for(int j = 0; j < 6; j++)
+                texCoords2[it++] = texCoords[2*i+j];
     }
 }
 
