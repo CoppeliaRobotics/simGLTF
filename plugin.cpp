@@ -52,7 +52,6 @@ struct simAnimFrame
     }
 };
 
-std::map<int, int> materialMap;
 std::map<int, int> textureMap;
 
 // for animation data:
@@ -379,42 +378,34 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     model->meshes[i].primitives[0].indices = ai;
     model->meshes[i].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
 
-    int colorKey = 0;
-    for(int i = 0; i < diffuse.size(); i++) colorKey = colorKey * 100 + int(fmax(0.0, fmin(1.0, diffuse[i])) * 99);
-    if(!hasTexture && materialMap.find(colorKey) != materialMap.end())
-        model->meshes[i].primitives[0].material = materialMap[colorKey];
-    else
+    int mat = model->materials.size();
+    model->meshes[i].primitives[0].material = mat;
+    model->materials.push_back({});
+    model->materials[mat].name = name + " material";
+    model->materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
+    model->materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
+    model->materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
+    model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
+    if(hasTexture)
     {
-        int mat = model->materials.size();
-        model->meshes[i].primitives[0].material = mat;
-        model->materials.push_back({});
-        model->materials[mat].name = name + " material";
-        model->materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
-        model->materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
-        model->materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
-        model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
-        if(hasTexture)
-        {
-            releaseBuffer(info.textureCoords);
-            releaseBuffer(info.texture);
-            model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
-            model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = model->textures.size();
-            bool repU = info.textureOptions & 1;
-            bool repV = info.textureOptions & 2;
-            bool interp = info.textureOptions & 4;
-            int sampler = model->samplers.size();
-            model->samplers.push_back({});
-            model->samplers[sampler].magFilter = interp ? TINYGLTF_TEXTURE_FILTER_LINEAR : TINYGLTF_TEXTURE_FILTER_NEAREST;
-            model->samplers[sampler].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
-            model->samplers[sampler].wrapS = repU ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
-            model->samplers[sampler].wrapT = repV ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
-            int tex = model->textures.size();
-            model->textures.push_back({});
-            model->textures[tex].name = name + " texture";
-            model->textures[tex].sampler = sampler;
-            model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes);
-        }
-        materialMap[colorKey] = mat;
+        releaseBuffer(info.textureCoords);
+        releaseBuffer(info.texture);
+        model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
+        model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = model->textures.size();
+        bool repU = info.textureOptions & 1;
+        bool repV = info.textureOptions & 2;
+        bool interp = info.textureOptions & 4;
+        int sampler = model->samplers.size();
+        model->samplers.push_back({});
+        model->samplers[sampler].magFilter = interp ? TINYGLTF_TEXTURE_FILTER_LINEAR : TINYGLTF_TEXTURE_FILTER_NEAREST;
+        model->samplers[sampler].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
+        model->samplers[sampler].wrapS = repU ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
+        model->samplers[sampler].wrapT = repV ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
+        int tex = model->textures.size();
+        model->textures.push_back({});
+        model->textures[tex].name = name + " texture";
+        model->textures[tex].sampler = sampler;
+        model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes);
     }
     return i;
 }
