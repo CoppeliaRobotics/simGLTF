@@ -477,6 +477,25 @@ bool isWireframe(simInt handle)
     return is(handle, sim_shapeintparam_wireframe);
 }
 
+bool isVisible(simInt handle)
+{
+    simInt visibleLayers = getVisibleLayers();
+    simInt layers = getObjectLayers(handle);
+    return visibleLayers & layers;
+}
+
+bool isShape(simInt handle)
+{
+    simInt objType = simGetObjectType(handle);
+    return objType == sim_object_shape_type;
+}
+
+bool isCamera(simInt handle)
+{
+    simInt objType = simGetObjectType(handle);
+    return objType == sim_object_camera_type;
+}
+
 std::vector<simInt> ungroupShape(simInt handle)
 {
     std::vector<simInt> ret;
@@ -521,6 +540,8 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
     {
         for(simInt subObj : ungroupShapeCopy(obj))
         {
+            if(!isVisible(subObj) || !isShape(subObj) || isWireframe(subObj))
+                continue;
             exportShape_in args;
             args.handle = in->handle;
             args.shapeHandle = subObj;
@@ -541,11 +562,8 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
     auto model = getModel(in->handle);
     simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
-    simInt layers = getObjectLayers(obj);
-    bool visible = visibleLayers & layers;
 
-    simInt objType = simGetObjectType(obj);
-    if(objType == sim_object_shape_type && visible)
+    if(isShape(obj) && isVisible(obj))
     {
         exportShape_in args;
         args.handle = in->handle;
@@ -554,7 +572,7 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         exportShape(p, &args, &ret);
         out->nodeIndex = ret.nodeIndex;
     }
-    if(objType == sim_object_camera_type)
+    if(isCamera(obj))
     {
         int cameraIndex = model->cameras.size();
         model->cameras.push_back({});
@@ -584,12 +602,7 @@ void getAllObjects(std::vector<simInt> &v)
         for(int i = 0; i < allObjectsCount; i++)
         {
             simInt obj = allObjectsBuf[i];
-            simInt objType = simGetObjectType(obj);
-            simInt visibleLayers = getVisibleLayers();
-            simInt layers = getObjectLayers(obj);
-            bool visible = visibleLayers & layers;
-            if((objType == sim_object_shape_type && visible && !isWireframe(obj))
-                    || objType == sim_object_camera_type)
+            if((isShape(obj) && isVisible(obj)) || isCamera(obj))
                 v.push_back(obj);
         }
         releaseBuffer(allObjectsBuf);
