@@ -161,17 +161,15 @@ void serialize(SScriptCallBack *p, const char *cmd, serialize_in *in, serialize_
     out->json = ss.str();
 }
 
-bool getGLTFMatrix(int handle, int relTo, std::vector<double> &m)
+bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
 {
-    simFloat x[12];
-    if(simGetObjectMatrix(handle, relTo, &x[0]) == -1)
+    simFloat t[3], r[4];
+    if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
         return false;
-    m = {
-        x[0], x[4], x[8], 0,
-        x[1], x[5], x[9], 0,
-        x[2], x[6], x[10], 0,
-        x[3], x[7], x[11], 1
-    };
+    if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
+        return false;
+    node.translation = {t[0], t[1], t[2]};
+    node.rotation = {r[0], r[1], r[2], r[3]};
     return true;
 }
 
@@ -534,7 +532,7 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
     model->nodes.push_back({});
     model->nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
     model->nodes[out->nodeIndex].name = getObjectName(obj);
-    getGLTFMatrix(obj, in->parentHandle, model->nodes[out->nodeIndex].matrix);
+    getGLTFPose(obj, in->parentHandle, model->nodes[out->nodeIndex]);
 
     if(isCompound(obj))
     {
@@ -587,7 +585,7 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         model->nodes.push_back({});
         model->nodes[out->nodeIndex].camera = cameraIndex;
         model->nodes[out->nodeIndex].name = getObjectName(obj);
-        getGLTFMatrix(obj, -1, model->nodes[out->nodeIndex].matrix);
+        getGLTFPose(obj, -1, model->nodes[out->nodeIndex]);
     }
 
     nodeIndex[obj] = out->nodeIndex;
