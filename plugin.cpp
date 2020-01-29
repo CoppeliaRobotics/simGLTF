@@ -173,9 +173,9 @@ bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
 }
 
 template<typename T>
-void minMax(const T *v, simInt size, simInt offset, simInt step, double &min, double &max)
+void minMax(const std::vector<T> &v, simInt offset, simInt step, double &min, double &max)
 {
-    for(int i = offset; i < size; i += step)
+    for(int i = offset; i < v.size(); i += step)
     {
         if(i == offset || v[i] < min) min = v[i];
         if(i == offset || v[i] > max) max = v[i];
@@ -183,12 +183,12 @@ void minMax(const T *v, simInt size, simInt offset, simInt step, double &min, do
 }
 
 template<typename T>
-void minMaxVec(const T *v, simInt size, simInt step, std::vector<double> &min, std::vector<double> &max)
+void minMaxVec(const std::vector<T> &v, simInt step, std::vector<double> &min, std::vector<double> &max)
 {
     min.resize(step);
     max.resize(step);
     for(int i = 0; i < step; i++)
-        minMax(v, size, i, step, min[i], max[i]);
+        minMax(v, i, step, min[i], max[i]);
 }
 
 template<typename T>
@@ -358,13 +358,13 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int vt = hasTexture ? addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord") : -1;
 
     std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
-    minMaxVec(vertices2.data(), vertices2.size(), 3, vmin, vmax);
+    minMaxVec(vertices2, 3, vmin, vmax);
     int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
-    minMaxVec(indices2.data(), indices2.size(), 1, imin, imax);
+    minMaxVec(indices2, 1, imin, imax);
     int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
-    minMaxVec(normals2.data(), normals2.size(), 3, nmin, nmax);
+    minMaxVec(normals2, 3, nmin, nmax);
     int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
-    if(hasTexture) minMaxVec(texCoords2.data(), texCoords2.size(), 2, tmin, tmax);
+    if(hasTexture) minMaxVec(texCoords2, 2, tmin, tmax);
     int at = hasTexture ? addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord") : -1;
 
     int i = model->meshes.size();
@@ -646,7 +646,7 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
     int bt = addBuffer(model, t.data(), sizeof(simFloat) * n, "time");
     int vt = addBufferView(model, bt, sizeof(simFloat) * n, 0, "time");
     std::vector<double> tmin, tmax;
-    minMaxVec(t.data(), n, 1, tmin, tmax);
+    minMaxVec(t, 1, tmin, tmax);
     int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
     for(simInt handle : handles)
@@ -680,13 +680,13 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         int bp = addBuffer(model, p.data(), sizeof(simFloat) * n * 3, name + " position");
         int vp = addBufferView(model, bp, sizeof(simFloat) * n * 3, 0, name + " position");
         std::vector<double> pmin, pmax;
-        minMaxVec(p.data(), n * 3, 3, pmin, pmax);
+        minMaxVec(p, 3, pmin, pmax);
         int ap = addAccessor(model, vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
         int br = addBuffer(model, r.data(), sizeof(simFloat) * n * 4, name + " rotation");
         int vr = addBufferView(model, br, sizeof(simFloat) * n * 4, 0, name + " rotation");
         std::vector<double> rmin, rmax;
-        minMaxVec(r.data(), n * 4, 4, rmin, rmax);
+        minMaxVec(r, 4, rmin, rmax);
         int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
         // create samplers & channels:
