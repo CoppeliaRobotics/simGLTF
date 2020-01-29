@@ -552,7 +552,7 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
     simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
 
-    if(isShape(obj) && isVisible(obj))
+    if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
     {
         exportShape_in args;
         args.handle = in->handle;
