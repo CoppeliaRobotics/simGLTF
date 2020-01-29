@@ -641,12 +641,12 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
 
     // create time buffer:
     int n = frames.size();
-    simFloat t[n];
+    std::vector<simFloat> t(n);
     for(int i = 0; i < n; i++) t[i] = frames[i].time;
-    int bt = addBuffer(model, t, sizeof(simFloat) * n, "time");
+    int bt = addBuffer(model, t.data(), sizeof(simFloat) * n, "time");
     int vt = addBufferView(model, bt, sizeof(simFloat) * n, 0, "time");
     std::vector<double> tmin, tmax;
-    minMaxVec(t, n, 1, tmin, tmax);
+    minMaxVec(t.data(), n, 1, tmin, tmax);
     int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
     for(simInt handle : handles)
@@ -667,7 +667,7 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
 
         // create translation and rotation buffers:
         std::string name = getObjectName(handle);
-        simFloat p[n * 3], r[n * 4];
+        std::vector<simFloat> p(n * 3), r(n * 4);
         int hi = handleIndex[handle];
         for(int i = 0; i < n; i++)
         {
@@ -677,16 +677,16 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
                 r[4 * i + j] = frames[i].poses[hi].orientation[j];
         }
 
-        int bp = addBuffer(model, p, sizeof(simFloat) * n * 3, name + " position");
+        int bp = addBuffer(model, p.data(), sizeof(simFloat) * n * 3, name + " position");
         int vp = addBufferView(model, bp, sizeof(simFloat) * n * 3, 0, name + " position");
         std::vector<double> pmin, pmax;
-        minMaxVec(p, n * 3, 3, pmin, pmax);
+        minMaxVec(p.data(), n * 3, 3, pmin, pmax);
         int ap = addAccessor(model, vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
-        int br = addBuffer(model, r, sizeof(simFloat) * n * 4, name + " rotation");
+        int br = addBuffer(model, r.data(), sizeof(simFloat) * n * 4, name + " rotation");
         int vr = addBufferView(model, br, sizeof(simFloat) * n * 4, 0, name + " rotation");
         std::vector<double> rmin, rmax;
-        minMaxVec(r, n * 4, 4, rmin, rmax);
+        minMaxVec(r.data(), n * 4, 4, rmin, rmax);
         int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
         // create samplers & channels:
