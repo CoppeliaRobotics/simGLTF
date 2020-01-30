@@ -84,11 +84,46 @@ tinygltf::Model * getModel(const std::string &handle)
     return model;
 }
 
-void reportError(const std::string &message)
+const int error = 0;
+const int warn = 1;
+const int info = 2;
+const int debug = 3;
+const int trace = 4;
+int verboseLevel = warn;
+
+void addMessage(int level, const std::string &message)
 {
+    if(level > verboseLevel) return;
     std::string m = "glTF: " + message;
     simAddStatusbarMessage(m.c_str());
     std::cerr << m << std::endl;
+}
+
+void addMessageFmt(int level, const boost::format &format)
+{
+    addMessage(level, format.str());
+}
+
+template<class T, class... Args>
+void addMessageFmt(int level, boost::format &format, T &&t, Args&&... args)
+{
+    return addMessageFmt(level, format % std::forward<T>(t), std::forward<Args>(args)...);
+}
+
+template<typename... Arguments>
+void addMessage(int level, std::string const &fmt, Arguments&&... args)
+{
+    try
+    {
+        boost::format format(fmt);
+        addMessageFmt(level, format, std::forward<Arguments>(args)...);
+    }
+    catch(boost::io::too_many_args &ex)
+    {
+        std::string s = fmt;
+        s += " (error during formatting)";
+        addMessage(level, s);
+    }
 }
 
 void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
@@ -284,7 +319,11 @@ std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2])
 
 int addImage(tinygltf::Model *model, simInt id, void *imgdata, int res[2])
 {
-    if(textureMap.find(id) != textureMap.end()) return textureMap[id];
+    if(textureMap.find(id) != textureMap.end())
+    {
+        addMessage(debug, "addImage: texture with id %d already loaded at index %d", id, textureMap[id]);
+        return textureMap[id];
+    }
 
     auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res);
     std::string name = (boost::format("texture image %d (%dx%d, %d bytes)") % id % res[0] % res[1] % buf.size()).str();
@@ -299,6 +338,8 @@ int addImage(tinygltf::Model *model, simInt id, void *imgdata, int res[2])
     model->images[i].mimeType = "image/bmp";
     model->images[i].name = name;
     textureMap[id] = i;
+    addMessage(debug, "addImage: loaded texture with id %d at index %d", id, i);
+    addMessage(trace, "addImage: model now has %d images", model->images.size());
     return i;
 }
 
@@ -329,10 +370,13 @@ void expandVertices(simFloat *vertices, simInt verticesSize, simInt *indices, si
 
 int addMesh(tinygltf::Model *model, int handle, const std::string &name)
 {
+    addMessage(trace, "addMesh: %s: adding mesh for shape handle %d", name, handle);
+
     struct SShapeVizInfo info;
     simInt result = simGetShapeViz(handle, 0, &info);
     if(result < 1) throw std::runtime_error((boost::format("simGetShapeViz returned %d") % result).str());
     bool hasTexture = result == 2;
+    addMessage(debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
     std::vector<simFloat> vertices2;
     std::vector<simInt> indices2;
@@ -653,7 +697,7 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
     {
         if(nodeIndex.find(handle) == nodeIndex.end())
         {
-            reportError((boost::format("Object with handle %d (%s) has no corresponding node") % handle % getObjectName(handle)).str());
+            addMessage(error, "error: object with handle %d (%s) has no corresponding node", handle, getObjectName(handle));
             continue;
         }
 
