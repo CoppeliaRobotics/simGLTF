@@ -60,6 +60,14 @@ std::map<int, size_t> handleIndex;
 std::vector<simAnimFrame> frames;
 std::map<int, size_t> nodeIndex;
 
+// for messages:
+const int error = 0;
+const int warn = 1;
+const int info = 2;
+const int debug = 3;
+const int trace = 4;
+int verboseLevel = warn;
+
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
 {
@@ -83,13 +91,6 @@ tinygltf::Model * getModel(const std::string &handle)
     if(!model) throw std::runtime_error("invalid glTF model handle");
     return model;
 }
-
-const int error = 0;
-const int warn = 1;
-const int info = 2;
-const int debug = 3;
-const int trace = 4;
-int verboseLevel = warn;
 
 void addMessage(int level, const std::string &message)
 {
@@ -791,6 +792,9 @@ public:
     {
         if(!registerScriptStuff())
             throw std::runtime_error("failed to register script stuff");
+
+        char *vl = std::getenv("COPPELIASIM_GLTF_VERBOSE");
+        if(vl) verboseLevel = std::atoi(vl);
 
         simSetModuleInfo(PLUGIN_NAME, 0, "glTF support", 0);
         simSetModuleInfo(PLUGIN_NAME, 1, BUILD_DATE, 0);
