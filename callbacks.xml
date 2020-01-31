@@ -3,6 +3,13 @@
 
 <plugin name="glTF" short-name="GLTF" author="federico.ferri.it@gmail.com">
     <description>Plugin for glTF format support</description>
+    <command name="clear">
+        <description>Clear internal cache. Call this before export.</description>
+        <params>
+        </params>
+        <return>
+        </return>
+    </command>
     <command name="create">
         <description>Create an empty glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
         <params>

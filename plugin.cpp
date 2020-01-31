@@ -126,6 +126,12 @@ void addMessage(int level, std::string const &fmt, Arguments&&... args)
     }
 }
 
+void clear(SScriptCallBack *p, const char *cmd, clear_in *in, clear_out *out)
+{
+    nodeIndex.clear();
+    textureMap.clear();
+}
+
 void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
 {
     tinygltf::Model *model = new tinygltf::Model;
