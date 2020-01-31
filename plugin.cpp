@@ -579,15 +579,16 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
     {
         for(simInt subObj : ungroupShapeCopy(obj))
         {
-            if(!isVisible(subObj) || !isShape(subObj) || isWireframe(subObj))
-                continue;
-            exportShape_in args;
-            args.handle = in->handle;
-            args.shapeHandle = subObj;
-            args.parentHandle = obj;
-            args.parentNodeIndex = out->nodeIndex;
-            exportShape_out ret;
-            exportShape(p, &args, &ret);
+            if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
+            {
+                exportShape_in args;
+                args.handle = in->handle;
+                args.shapeHandle = subObj;
+                args.parentHandle = obj;
+                args.parentNodeIndex = out->nodeIndex;
+                exportShape_out ret;
+                exportShape(p, &args, &ret);
+            }
             simRemoveObject(subObj);
         }
         return;
