@@ -67,6 +67,7 @@ const int info = 2;
 const int debug = 3;
 const int trace = 4;
 int verboseLevel = warn;
+int bufferPreviewSize = 0;
 
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
@@ -103,6 +104,32 @@ void addMessage(int level, const std::string &message)
 void addMessageFmt(int level, const boost::format &format)
 {
     addMessage(level, format.str());
+}
+
+std::string buf2str(const void *data, size_t size)
+{
+    auto b = reinterpret_cast<const unsigned char*>(data);
+
+    std::string dataPreview;
+
+    if(bufferPreviewSize)
+    {
+        dataPreview = "{";
+        for(int i = 0; i < size; i++)
+        {
+            dataPreview += i ? " " : "";
+            if(i >= bufferPreviewSize)
+            {
+                if(i) dataPreview += "...";
+                break;
+            }
+            dataPreview += boost::lexical_cast<std::string>(int(b[i]));
+        }
+        dataPreview += "} ";
+    }
+    dataPreview += (boost::format("(%d bytes)") % size).str();
+
+    return dataPreview;
 }
 
 template<class T, class... Args>
@@ -239,12 +266,13 @@ void releaseBuffer(const T *b)
     simReleaseBuffer(reinterpret_cast<const char *>(b));
 }
 
-int addBuffer(tinygltf::Model *model, void *buffer, int size, const std::string &name)
+int addBuffer(tinygltf::Model *model, const void *buffer, int size, const std::string &name)
 {
     int i = model->buffers.size();
     model->buffers.push_back({});
     model->buffers[i].data.resize(size);
     model->buffers[i].name = name + " buffer";
+    addMessage(debug, "addBuffer: added buffer '%s' %s", name, buf2str(buffer, size));
     std::memcpy(model->buffers[i].data.data(), buffer, size);
     return i;
 }
@@ -324,16 +352,18 @@ std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2])
     return buf;
 }
 
-int addImage(tinygltf::Model *model, simInt id, void *imgdata, int res[2])
+int addImage(tinygltf::Model *model, simInt id, const void *imgdata, int res[2], const std::string &objname)
 {
     if(textureMap.find(id) != textureMap.end())
     {
         addMessage(debug, "addImage: texture with id %d already loaded at index %d", id, textureMap[id]);
         return textureMap[id];
     }
+    addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
 
     auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res);
-    std::string name = (boost::format("texture image %d (%dx%d, %d bytes)") % id % res[0] % res[1] % buf.size()).str();
+    addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
+    std::string name = (boost::format("texture image %d [%s] (%dx%d, %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
     int b = addBuffer(model, buf.data(), buf.size(), name);
 
@@ -345,7 +375,7 @@ int addImage(tinygltf::Model *model, simInt id, void *imgdata, int res[2])
     model->images[i].mimeType = "image/bmp";
     model->images[i].name = name;
     textureMap[id] = i;
-    addMessage(debug, "addImage: loaded texture with id %d at index %d", id, i);
+    addMessage(debug, "addImage: loaded texture of object %s with id %d at index %d %s", objname, id, i, buf2str(imgdata, res[0] * res[1] * 4));
     addMessage(trace, "addImage: model now has %d images", model->images.size());
     return i;
 }
@@ -456,7 +486,7 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
         model->textures.push_back({});
         model->textures[tex].name = name + " texture";
         model->textures[tex].sampler = sampler;
-        model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes);
+        model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes, name);
     }
     return i;
 }
@@ -795,6 +825,9 @@ public:
 
         char *vl = std::getenv("COPPELIASIM_GLTF_VERBOSE");
         if(vl) verboseLevel = std::atoi(vl);
+
+        char *ps = std::getenv("COPPELIASIM_GLTF_BUFFER_PREVIEW");
+        if(ps) bufferPreviewSize = std::atoi(ps);
 
         simSetModuleInfo(PLUGIN_NAME, 0, "glTF support", 0);
         simSetModuleInfo(PLUGIN_NAME, 1, BUILD_DATE, 0);
