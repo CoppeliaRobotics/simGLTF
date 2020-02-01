@@ -354,8 +354,7 @@ int addImage(tinygltf::Model *model, simInt id, const void *imgdata, int res[2],
     addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
 
     auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
-    addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
-    std::string name = (boost::format("texture image %d [%s] (%dx%d, %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
+    std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
     int b = addBuffer(model, buf.data(), buf.size(), name);
 
