@@ -461,8 +461,6 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
     if(hasTexture)
     {
-        releaseBuffer(info.textureCoords);
-        releaseBuffer(info.texture);
         model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
         model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = model->textures.size();
         bool repU = info.textureOptions & 1;
@@ -479,6 +477,8 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
         model->textures[tex].name = name + " texture";
         model->textures[tex].sampler = sampler;
         model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes, name);
+        releaseBuffer(info.textureCoords);
+        releaseBuffer(info.texture);
     }
     return i;
 }
