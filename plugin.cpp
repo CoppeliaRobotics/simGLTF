@@ -667,7 +667,7 @@ void getAllObjects(std::vector<simInt> &v)
         for(int i = 0; i < allObjectsCount; i++)
         {
             simInt obj = allObjectsBuf[i];
-            if((isShape(obj) && isVisible(obj)) || isCamera(obj))
+            if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
                 v.push_back(obj);
         }
         releaseBuffer(allObjectsBuf);
