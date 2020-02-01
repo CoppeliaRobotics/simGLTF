@@ -529,12 +529,10 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int bv = addBuffer(model, vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
     int bi = addBuffer(model, indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
     int bn = addBuffer(model, normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
-    int bt = hasTexture ? addBuffer(model, texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord") : -1;
 
     int vv = addBufferView(model, bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
     int vi = addBufferView(model, bi, sizeof(simInt) * indices2.size(), 0, name + " index");
     int vn = addBufferView(model, bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
-    int vt = hasTexture ? addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord") : -1;
 
     std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
     minMaxVec(vertices2, 3, vmin, vmax);
@@ -543,32 +541,32 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
     minMaxVec(normals2, 3, nmin, nmax);
     int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
-    if(hasTexture) minMaxVec(texCoords2, 2, tmin, tmax);
-    int at = hasTexture ? addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord") : -1;
 
-    int i = model->meshes.size();
+    int mesh = model->meshes.size();
     model->meshes.push_back({});
-    model->meshes[i].name = name + " mesh";
-    model->meshes[i].primitives.push_back({});
-    model->meshes[i].primitives[0].attributes["POSITION"] = av;
-    model->meshes[i].primitives[0].attributes["NORMAL"] = an;
-    if(hasTexture)
-        model->meshes[i].primitives[0].attributes["TEXCOORD_0"] = at;
-    model->meshes[i].primitives[0].indices = ai;
-    model->meshes[i].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
+    model->meshes[mesh].name = name + " mesh";
+    model->meshes[mesh].primitives.push_back({});
+    model->meshes[mesh].primitives[0].attributes["POSITION"] = av;
+    model->meshes[mesh].primitives[0].attributes["NORMAL"] = an;
+    model->meshes[mesh].primitives[0].indices = ai;
+    model->meshes[mesh].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
 
     int mat = model->materials.size();
-    model->meshes[i].primitives[0].material = mat;
+    model->meshes[mesh].primitives[0].material = mat;
     model->materials.push_back({});
     model->materials[mat].name = name + " material";
     model->materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
     model->materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
     model->materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
     model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
+
     if(hasTexture)
     {
-        model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
-        model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = model->textures.size();
+        int bt = addBuffer(model, texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord");
+        int vt = addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord");
+        minMaxVec(texCoords2, 2, tmin, tmax);
+        int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
+        model->meshes[mesh].primitives[0].attributes["TEXCOORD_0"] = at;
         bool repU = info.textureOptions & 1;
         bool repV = info.textureOptions & 2;
         bool interp = info.textureOptions & 4;
@@ -583,10 +581,13 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
         model->textures[tex].name = name + " texture";
         model->textures[tex].sampler = sampler;
         model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes, name);
+        model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
+        model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = tex;
         releaseBuffer(info.textureCoords);
         releaseBuffer(info.texture);
     }
-    return i;
+
+    return mesh;
 }
 
 void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, exportShape_out *out)
