@@ -23,6 +23,148 @@ tinygltf::TinyGLTF gltf;
 
 using sim::Handle;
 
+bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
+{
+    simFloat t[3], r[4];
+    if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
+        return false;
+    if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
+        return false;
+    node.translation = {t[0], t[1], t[2]};
+    node.rotation = {r[0], r[1], r[2], r[3]};
+    return true;
+}
+
+template<typename T>
+void minMax(const std::vector<T> &v, simInt offset, simInt step, double &min, double &max)
+{
+    for(int i = offset; i < v.size(); i += step)
+    {
+        if(i == offset || v[i] < min) min = v[i];
+        if(i == offset || v[i] > max) max = v[i];
+    }
+}
+
+template<typename T>
+void minMaxVec(const std::vector<T> &v, simInt step, std::vector<double> &min, std::vector<double> &max)
+{
+    min.resize(step);
+    max.resize(step);
+    for(int i = 0; i < step; i++)
+        minMax(v, i, step, min[i], max[i]);
+}
+
+template<typename T>
+void releaseBuffer(const T *b)
+{
+    simReleaseBuffer(reinterpret_cast<const char *>(b));
+}
+
+void getObjectSelection(std::vector<simInt> &v)
+{
+    int selectionSize = simGetObjectSelectionSize();
+    v.resize(selectionSize);
+    simGetObjectSelection(v.data());
+}
+
+simInt getVisibleLayers()
+{
+    simInt v = 0;
+    if(simGetInt32Parameter(sim_intparam_visible_layers, &v) == -1)
+        return 0;
+    else
+        return v;
+}
+
+std::string getObjectName(simInt handle)
+{
+    simChar *name = simGetObjectName(handle);
+    std::string ret;
+    if(name)
+    {
+        ret = name;
+        releaseBuffer(name);
+    }
+    return ret;
+}
+
+simInt getObjectLayers(simInt handle)
+{
+    simInt v = 0;
+    if(simGetObjectInt32Parameter(handle, sim_objintparam_visibility_layer, &v) == 1)
+        return v;
+    else
+        return 0;
+}
+
+bool is(simInt handle, simInt param)
+{
+    simInt v = 0;
+    if(simGetObjectInt32Parameter(handle, param, &v) == 1)
+        return v != 0;
+    else
+        return false;
+}
+
+bool isCompound(simInt handle)
+{
+    return is(handle, sim_shapeintparam_compound);
+}
+
+bool isWireframe(simInt handle)
+{
+    return is(handle, sim_shapeintparam_wireframe);
+}
+
+bool isVisible(simInt handle)
+{
+    simInt visibleLayers = getVisibleLayers();
+    simInt layers = getObjectLayers(handle);
+    return visibleLayers & layers;
+}
+
+bool isShape(simInt handle)
+{
+    simInt objType = simGetObjectType(handle);
+    return objType == sim_object_shape_type;
+}
+
+bool isCamera(simInt handle)
+{
+    simInt objType = simGetObjectType(handle);
+    return objType == sim_object_camera_type;
+}
+
+std::vector<simInt> ungroupShape(simInt handle)
+{
+    std::vector<simInt> ret;
+    simInt count;
+    simInt *shapes = simUngroupShape(handle, &count);
+    if(shapes)
+    {
+        ret.resize(count);
+        for(int i = 0; i < count; i++)
+            ret[i] = shapes[i];
+        releaseBuffer(shapes);
+    }
+    return ret;
+}
+
+std::vector<simInt> ungroupShapeCopy(simInt handle)
+{
+    simInt handles[1] = {handle};
+    simCopyPasteObjects(handles, 1, 0);
+    return ungroupShape(handles[0]);
+}
+
+std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
+{
+    std::vector<simFloat> ret;
+    ret.resize(3);
+    simGetShapeColor(handle, 0, colorComponent, ret.data());
+    return ret;
+}
+
 struct simPose3D
 {
     simInt handle;
@@ -227,43 +369,6 @@ void serialize(SScriptCallBack *p, const char *cmd, serialize_in *in, serialize_
     std::stringstream ss;
     gltf.WriteGltfSceneToStream(model, ss, true, false);
     out->json = ss.str();
-}
-
-bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
-{
-    simFloat t[3], r[4];
-    if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
-        return false;
-    if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
-        return false;
-    node.translation = {t[0], t[1], t[2]};
-    node.rotation = {r[0], r[1], r[2], r[3]};
-    return true;
-}
-
-template<typename T>
-void minMax(const std::vector<T> &v, simInt offset, simInt step, double &min, double &max)
-{
-    for(int i = offset; i < v.size(); i += step)
-    {
-        if(i == offset || v[i] < min) min = v[i];
-        if(i == offset || v[i] > max) max = v[i];
-    }
-}
-
-template<typename T>
-void minMaxVec(const std::vector<T> &v, simInt step, std::vector<double> &min, std::vector<double> &max)
-{
-    min.resize(step);
-    max.resize(step);
-    for(int i = 0; i < step; i++)
-        minMax(v, i, step, min[i], max[i]);
-}
-
-template<typename T>
-void releaseBuffer(const T *b)
-{
-    simReleaseBuffer(reinterpret_cast<const char *>(b));
 }
 
 int addBuffer(tinygltf::Model *model, const void *buffer, int size, const std::string &name)
@@ -480,111 +585,6 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
         releaseBuffer(info.texture);
     }
     return i;
-}
-
-void getObjectSelection(std::vector<simInt> &v)
-{
-    int selectionSize = simGetObjectSelectionSize();
-    v.resize(selectionSize);
-    simGetObjectSelection(v.data());
-}
-
-simInt getVisibleLayers()
-{
-    simInt v = 0;
-    if(simGetInt32Parameter(sim_intparam_visible_layers, &v) == -1)
-        return 0;
-    else
-        return v;
-}
-
-std::string getObjectName(simInt handle)
-{
-    simChar *name = simGetObjectName(handle);
-    std::string ret;
-    if(name)
-    {
-        ret = name;
-        releaseBuffer(name);
-    }
-    return ret;
-}
-
-simInt getObjectLayers(simInt handle)
-{
-    simInt v = 0;
-    if(simGetObjectInt32Parameter(handle, sim_objintparam_visibility_layer, &v) == 1)
-        return v;
-    else
-        return 0;
-}
-
-bool is(simInt handle, simInt param)
-{
-    simInt v = 0;
-    if(simGetObjectInt32Parameter(handle, param, &v) == 1)
-        return v != 0;
-    else
-        return false;
-}
-
-bool isCompound(simInt handle)
-{
-    return is(handle, sim_shapeintparam_compound);
-}
-
-bool isWireframe(simInt handle)
-{
-    return is(handle, sim_shapeintparam_wireframe);
-}
-
-bool isVisible(simInt handle)
-{
-    simInt visibleLayers = getVisibleLayers();
-    simInt layers = getObjectLayers(handle);
-    return visibleLayers & layers;
-}
-
-bool isShape(simInt handle)
-{
-    simInt objType = simGetObjectType(handle);
-    return objType == sim_object_shape_type;
-}
-
-bool isCamera(simInt handle)
-{
-    simInt objType = simGetObjectType(handle);
-    return objType == sim_object_camera_type;
-}
-
-std::vector<simInt> ungroupShape(simInt handle)
-{
-    std::vector<simInt> ret;
-    simInt count;
-    simInt *shapes = simUngroupShape(handle, &count);
-    if(shapes)
-    {
-        ret.resize(count);
-        for(int i = 0; i < count; i++)
-            ret[i] = shapes[i];
-        releaseBuffer(shapes);
-    }
-    return ret;
-}
-
-std::vector<simInt> ungroupShapeCopy(simInt handle)
-{
-    simInt handles[1] = {handle};
-    simCopyPasteObjects(handles, 1, 0);
-    return ungroupShape(handles[0]);
-}
-
-std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
-{
-    std::vector<simFloat> ret;
-    ret.resize(3);
-    simGetShapeColor(handle, 0, colorComponent, ret.data());
-    return ret;
 }
 
 void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, exportShape_out *out)
