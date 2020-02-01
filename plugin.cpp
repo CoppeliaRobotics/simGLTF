@@ -303,52 +303,44 @@ int addAccessor(tinygltf::Model *model, int bufferView, int byteOffset, int comp
     return i;
 }
 
-std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2])
+std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2], int bytesPerPixel)
 {
-    int bytesPerPixel = 4;
     int width = res[0];
     int height = res[1];
     int paddingSize = (4 - (width * bytesPerPixel) % 4) % 4;
-    int fileSize = 14 + 40 + (bytesPerPixel * width + paddingSize) * height;
+    int rowSize = bytesPerPixel * width + paddingSize;
+    int fileSize = 14 + 40 + rowSize * height;
     std::vector<unsigned char> buf(fileSize, 0);
-    unsigned char *fileHeader = buf.data();
-    fileHeader[ 0] = (unsigned char)('B');
-    fileHeader[ 1] = (unsigned char)('M');
-    fileHeader[ 2] = (unsigned char)(fileSize);
-    fileHeader[ 3] = (unsigned char)(fileSize >> 8);
-    fileHeader[ 4] = (unsigned char)(fileSize >> 16);
-    fileHeader[ 5] = (unsigned char)(fileSize >> 24);
-    fileHeader[10] = (unsigned char)(14 + 40);
-    unsigned char *infoHeader = fileHeader + 14;
-    infoHeader[ 0] = (unsigned char)(40);
-    infoHeader[ 4] = (unsigned char)(width);
-    infoHeader[ 5] = (unsigned char)(width >> 8);
-    infoHeader[ 6] = (unsigned char)(width >> 16);
-    infoHeader[ 7] = (unsigned char)(width >> 24);
-    infoHeader[ 8] = (unsigned char)(height);
-    infoHeader[ 9] = (unsigned char)(height >> 8);
-    infoHeader[10] = (unsigned char)(height >> 16);
-    infoHeader[11] = (unsigned char)(height >> 24);
-    infoHeader[12] = (unsigned char)(1);
-    infoHeader[14] = (unsigned char)(bytesPerPixel * 8);
-    unsigned char *imageData = infoHeader + 40;
+    buf[ 0] = (unsigned char)('B');
+    buf[ 1] = (unsigned char)('M');
+    buf[ 2] = (unsigned char)(fileSize);
+    buf[ 3] = (unsigned char)(fileSize >> 8);
+    buf[ 4] = (unsigned char)(fileSize >> 16);
+    buf[ 5] = (unsigned char)(fileSize >> 24);
+    buf[10] = (unsigned char)(14 + 40);
+    int h = 14;
+    buf[h +  0] = (unsigned char)(40);
+    buf[h +  4] = (unsigned char)(width);
+    buf[h +  5] = (unsigned char)(width >> 8);
+    buf[h +  6] = (unsigned char)(width >> 16);
+    buf[h +  7] = (unsigned char)(width >> 24);
+    buf[h +  8] = (unsigned char)(height);
+    buf[h +  9] = (unsigned char)(height >> 8);
+    buf[h + 10] = (unsigned char)(height >> 16);
+    buf[h + 11] = (unsigned char)(height >> 24);
+    buf[h + 12] = (unsigned char)(1);
+    buf[h + 14] = (unsigned char)(bytesPerPixel * 8);
+    h += 40;
     unsigned char byteOrder[4] = {2, 1, 0, 3};
     for(int i = height - 1; i >= 0; i--)
     {
         for(int j = 0; j < width * bytesPerPixel; j += bytesPerPixel)
-        {
             for(int k = 0; k < 4; k++)
-            {
-                imageData[k] = data[i * (width * bytesPerPixel + paddingSize) + j + byteOrder[k]];
-            }
-            imageData += 4;
-        }
+                buf[h++] = data[i * rowSize + j + byteOrder[k]];
         for(int j = 0; j < paddingSize; j++)
-        {
-            imageData[j] = 0;
-        }
-        imageData += paddingSize;
+            buf[h++] = 0;
     }
+    assert(h == fileSize);
     return buf;
 }
 
@@ -361,7 +353,7 @@ int addImage(tinygltf::Model *model, simInt id, const void *imgdata, int res[2],
     }
     addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
 
-    auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res);
+    auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
     addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
     std::string name = (boost::format("texture image %d [%s] (%dx%d, %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
