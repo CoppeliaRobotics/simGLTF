@@ -170,12 +170,14 @@ struct simPose3D
     simInt handle;
     simFloat position[3];
     simFloat orientation[4];
+    bool visible;
 
     void get(int handle, int relTo)
     {
         this->handle = handle;
         simGetObjectPosition(handle, relTo, &position[0]);
         simGetObjectQuaternion(handle, relTo, &orientation[0]);
+        visible = isVisible(handle) && !isWireframe(handle);
     }
 };
 
@@ -737,10 +739,14 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         int ir = model->animations[0].channels.size();
         model->animations[0].channels.push_back({});
         model->animations[0].samplers.push_back({});
+        // XXX: animate visibility with scale channel
+        int is = model->animations[0].channels.size();
+        model->animations[0].channels.push_back({});
+        model->animations[0].samplers.push_back({});
 
         // create translation and rotation buffers:
         std::string name = getObjectName(handle);
-        std::vector<simFloat> p(n * 3), r(n * 4);
+        std::vector<simFloat> p(n * 3), r(n * 4), s(n * 3);
         int hi = handleIndex[handle];
         for(int i = 0; i < n; i++)
         {
@@ -748,6 +754,8 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
                 p[3 * i + j] = frames[i].poses[hi].position[j];
             for(int j = 0; j < 4; j++)
                 r[4 * i + j] = frames[i].poses[hi].orientation[j];
+            for(int j = 0; j < 3; j++)
+                s[3 * i + j] = frames[i].poses[hi].visible ? 1.0 : 0.0;
         }
 
         int bp = addBuffer(model, p.data(), sizeof(simFloat) * n * 3, name + " position");
@@ -762,6 +770,12 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         minMaxVec(r, 4, rmin, rmax);
         int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
+        int bs = addBuffer(model, s.data(), sizeof(simFloat) * n * 3, name + " scale");
+        int vs = addBufferView(model, bs, sizeof(simFloat) * n * 3, 0, name + " scale");
+        std::vector<double> smin, smax;
+        minMaxVec(s, 3, smin, smax);
+        int as = addAccessor(model, vs, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
+
         // create samplers & channels:
         model->animations[0].samplers[ip].interpolation = "STEP";
         model->animations[0].samplers[ip].input = at;
@@ -775,6 +789,12 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         model->animations[0].channels[ir].sampler = ir;
         model->animations[0].channels[ir].target_node = nodeIndex[handle];
         model->animations[0].channels[ir].target_path = "rotation";
+        model->animations[0].samplers[is].interpolation = "STEP";
+        model->animations[0].samplers[is].input = at;
+        model->animations[0].samplers[is].output = as;
+        model->animations[0].channels[is].sampler = is;
+        model->animations[0].channels[is].target_node = nodeIndex[handle];
+        model->animations[0].channels[is].target_path = "scale";
     }
 }
 
