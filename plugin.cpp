@@ -4,7 +4,6 @@
 #include <sstream>
 #include <vector>
 #include "simPlusPlus/Plugin.h"
-#include "simPlusPlus/Handle.h"
 #include "plugin.h"
 #include "stubs.h"
 #include "config.h"
@@ -38,6 +37,7 @@ struct simAnimFrame
 };
 
 tinygltf::TinyGLTF gltf;
+tinygltf::Model model;
 
 std::map<int, int> textureMap;
 
@@ -55,16 +55,6 @@ const int debug = 3;
 const int trace = 4;
 int verboseLevel = warn;
 int bufferPreviewSize = 0;
-
-namespace sim
-{
-    template<> std::string Handle<tinygltf::Model>::tag()
-    {
-        return PLUGIN_NAME ".model";
-    }
-} // namespace sim
-
-using sim::Handle;
 
 bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
 {
@@ -237,13 +227,6 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
     return out;
 }
 
-tinygltf::Model * getModel(const std::string &handle)
-{
-    tinygltf::Model *model = Handle<tinygltf::Model>::obj(handle);
-    if(!model) throw std::runtime_error("invalid glTF model handle");
-    return model;
-}
-
 void addMessage(int level, const std::string &message)
 {
     if(level > verboseLevel) return;
@@ -309,111 +292,104 @@ void clear(SScriptCallBack *p, const char *cmd, clear_in *in, clear_out *out)
 {
     nodeIndex.clear();
     textureMap.clear();
-}
 
-void create(SScriptCallBack *p, const char *cmd, create_in *in, create_out *out)
-{
-    tinygltf::Model *model = new tinygltf::Model;
+    model.accessors.clear();
+    model.animations.clear();
+    model.buffers.clear();
+    model.bufferViews.clear();
+    model.materials.clear();
+    model.meshes.clear();
+    model.nodes.clear();
+    model.textures.clear();
+    model.images.clear();
+    model.skins.clear();
+    model.samplers.clear();
+    model.cameras.clear();
+    model.scenes.clear();
+    model.lights.clear();
+    model.extensionsUsed.clear();
+    model.extensionsRequired.clear();
 
-    model->asset.version = "2.0";
-    model->asset.generator = "CoppeliaSim glTF plugin";
+    model.asset.version = "2.0";
+    model.asset.generator = "CoppeliaSim glTF plugin";
 
-    model->nodes.push_back({});
-    model->nodes[0].name = "Root node";
-    model->nodes[0].matrix = {
+    model.nodes.push_back({});
+    model.nodes[0].name = "Root node";
+    model.nodes[0].matrix = {
        -1, 0, 0, 0,
         0, 0, 1, 0,
         0, 1, 0, 0,
         0, 0, 0, 1
     };
 
-    model->scenes.push_back({});
-    model->scenes[0].name = "Default Scene";
-    model->scenes[0].nodes = {0};
+    model.scenes.push_back({});
+    model.scenes[0].name = "Default Scene";
+    model.scenes[0].nodes = {0};
 
-    model->defaultScene = 0;
-
-    out->handle = Handle<tinygltf::Model>::str(model);
-}
-
-void destroy(SScriptCallBack *p, const char *cmd, destroy_in *in, destroy_out *out)
-{
-    auto model = getModel(in->handle);
-    delete model;
+    model.defaultScene = 0;
 }
 
 void loadASCII(SScriptCallBack *p, const char *cmd, loadASCII_in *in, loadASCII_out *out)
 {
-    tinygltf::Model *model = new tinygltf::Model;
-    if(gltf.LoadASCIIFromFile(model, &out->errors, &out->warnings, in->filepath))
-        out->handle = Handle<tinygltf::Model>::str(model);
-    else
-        delete model;
+    out->result = gltf.LoadASCIIFromFile(&model, &out->errors, &out->warnings, in->filepath);
 }
 
 void loadBinary(SScriptCallBack *p, const char *cmd, loadBinary_in *in, loadBinary_out *out)
 {
-    tinygltf::Model *model = new tinygltf::Model;
-    if(gltf.LoadBinaryFromFile(model, &out->errors, &out->warnings, in->filepath))
-        out->handle = Handle<tinygltf::Model>::str(model);
-    else
-        delete model;
+    out->result = gltf.LoadBinaryFromFile(&model, &out->errors, &out->warnings, in->filepath);
 }
 
 void saveASCII(SScriptCallBack *p, const char *cmd, saveASCII_in *in, saveASCII_out *out)
 {
-    auto model = getModel(in->handle);
-    out->success = gltf.WriteGltfSceneToFile(model, in->filepath, true, true, true, false);
+    out->result = gltf.WriteGltfSceneToFile(&model, in->filepath, true, true, true, false);
 }
 
 void saveBinary(SScriptCallBack *p, const char *cmd, saveBinary_in *in, saveBinary_out *out)
 {
-    auto model = getModel(in->handle);
-    out->success = gltf.WriteGltfSceneToFile(model, in->filepath, true, true, true, true);
+    out->result = gltf.WriteGltfSceneToFile(&model, in->filepath, true, true, true, true);
 }
 
 void serialize(SScriptCallBack *p, const char *cmd, serialize_in *in, serialize_out *out)
 {
-    auto model = getModel(in->handle);
     std::stringstream ss;
-    gltf.WriteGltfSceneToStream(model, ss, true, false);
+    gltf.WriteGltfSceneToStream(&model, ss, true, false);
     out->json = ss.str();
 }
 
-int addBuffer(tinygltf::Model *model, const void *buffer, int size, const std::string &name)
+int addBuffer(const void *buffer, int size, const std::string &name)
 {
-    int i = model->buffers.size();
-    model->buffers.push_back({});
-    model->buffers[i].data.resize(size);
-    model->buffers[i].name = name + " buffer";
+    int i = model.buffers.size();
+    model.buffers.push_back({});
+    model.buffers[i].data.resize(size);
+    model.buffers[i].name = name + " buffer";
     addMessage(debug, "addBuffer: added buffer '%s' %s", name, buf2str(buffer, size));
-    std::memcpy(model->buffers[i].data.data(), buffer, size);
+    std::memcpy(model.buffers[i].data.data(), buffer, size);
     return i;
 }
 
-int addBufferView(tinygltf::Model *model, int buffer, int byteLength, int byteOffset, const std::string &name)
+int addBufferView(int buffer, int byteLength, int byteOffset, const std::string &name)
 {
-    int i = model->bufferViews.size();
-    model->bufferViews.push_back({});
-    model->bufferViews[i].buffer = buffer;
-    model->bufferViews[i].byteLength = byteLength;
-    model->bufferViews[i].byteOffset = byteOffset;
-    model->bufferViews[i].name = name + " buffer view";
+    int i = model.bufferViews.size();
+    model.bufferViews.push_back({});
+    model.bufferViews[i].buffer = buffer;
+    model.bufferViews[i].byteLength = byteLength;
+    model.bufferViews[i].byteOffset = byteOffset;
+    model.bufferViews[i].name = name + " buffer view";
     return i;
 }
 
-int addAccessor(tinygltf::Model *model, int bufferView, int byteOffset, int componentType, int type, int count, const std::vector<double> &minValues, const std::vector<double> &maxValues, const std::string &name)
+int addAccessor(int bufferView, int byteOffset, int componentType, int type, int count, const std::vector<double> &minValues, const std::vector<double> &maxValues, const std::string &name)
 {
-    int i = model->accessors.size();
-    model->accessors.push_back({});
-    model->accessors[i].bufferView = bufferView;
-    model->accessors[i].byteOffset = byteOffset;
-    model->accessors[i].componentType = componentType;
-    model->accessors[i].type = type;
-    model->accessors[i].count = count;
-    model->accessors[i].minValues = minValues;
-    model->accessors[i].maxValues = maxValues;
-    model->accessors[i].name = name + " accessor";
+    int i = model.accessors.size();
+    model.accessors.push_back({});
+    model.accessors[i].bufferView = bufferView;
+    model.accessors[i].byteOffset = byteOffset;
+    model.accessors[i].componentType = componentType;
+    model.accessors[i].type = type;
+    model.accessors[i].count = count;
+    model.accessors[i].minValues = minValues;
+    model.accessors[i].maxValues = maxValues;
+    model.accessors[i].name = name + " accessor";
     return i;
 }
 
@@ -458,7 +434,7 @@ std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2], int by
     return buf;
 }
 
-int addImage(tinygltf::Model *model, simInt id, const void *imgdata, int res[2], const std::string &objname)
+int addImage(simInt id, const void *imgdata, int res[2], const std::string &objname)
 {
     if(textureMap.find(id) != textureMap.end())
     {
@@ -470,18 +446,18 @@ int addImage(tinygltf::Model *model, simInt id, const void *imgdata, int res[2],
     auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
     std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
-    int b = addBuffer(model, buf.data(), buf.size(), name);
+    int b = addBuffer(buf.data(), buf.size(), name);
 
-    int v = addBufferView(model, b, buf.size(), 0, name);
+    int v = addBufferView(b, buf.size(), 0, name);
 
-    int i = model->images.size();
-    model->images.push_back({});
-    model->images[i].bufferView = v;
-    model->images[i].mimeType = "image/bmp";
-    model->images[i].name = name;
+    int i = model.images.size();
+    model.images.push_back({});
+    model.images[i].bufferView = v;
+    model.images[i].mimeType = "image/bmp";
+    model.images[i].name = name;
     textureMap[id] = i;
     addMessage(debug, "addImage: loaded texture of object %s with id %d at index %d %s", objname, id, i, buf2str(imgdata, res[0] * res[1] * 4));
-    addMessage(trace, "addImage: model now has %d images", model->images.size());
+    addMessage(trace, "addImage: model now has %d images", model.images.size());
     return i;
 }
 
@@ -510,7 +486,7 @@ void expandVertices(simFloat *vertices, simInt verticesSize, simInt *indices, si
     }
 }
 
-int addMesh(tinygltf::Model *model, int handle, const std::string &name)
+int addMesh(int handle, const std::string &name)
 {
     addMessage(trace, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
@@ -533,63 +509,63 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
     std::vector<simFloat> specular(&info.colors[3], &info.colors[3] + 3);
     std::vector<simFloat> emission(&info.colors[6], &info.colors[6] + 3);
 
-    int bv = addBuffer(model, vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
-    int bi = addBuffer(model, indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
-    int bn = addBuffer(model, normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
+    int bv = addBuffer(vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
+    int bi = addBuffer(indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
+    int bn = addBuffer(normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
 
-    int vv = addBufferView(model, bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
-    int vi = addBufferView(model, bi, sizeof(simInt) * indices2.size(), 0, name + " index");
-    int vn = addBufferView(model, bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
+    int vv = addBufferView(bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
+    int vi = addBufferView(bi, sizeof(simInt) * indices2.size(), 0, name + " index");
+    int vn = addBufferView(bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
 
     std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
     minMaxVec(vertices2, 3, vmin, vmax);
-    int av = addAccessor(model, vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
+    int av = addAccessor(vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
     minMaxVec(indices2, 1, imin, imax);
-    int ai = addAccessor(model, vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
+    int ai = addAccessor(vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
     minMaxVec(normals2, 3, nmin, nmax);
-    int an = addAccessor(model, vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
+    int an = addAccessor(vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
 
-    int mesh = model->meshes.size();
-    model->meshes.push_back({});
-    model->meshes[mesh].name = name + " mesh";
-    model->meshes[mesh].primitives.push_back({});
-    model->meshes[mesh].primitives[0].attributes["POSITION"] = av;
-    model->meshes[mesh].primitives[0].attributes["NORMAL"] = an;
-    model->meshes[mesh].primitives[0].indices = ai;
-    model->meshes[mesh].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
+    int mesh = model.meshes.size();
+    model.meshes.push_back({});
+    model.meshes[mesh].name = name + " mesh";
+    model.meshes[mesh].primitives.push_back({});
+    model.meshes[mesh].primitives[0].attributes["POSITION"] = av;
+    model.meshes[mesh].primitives[0].attributes["NORMAL"] = an;
+    model.meshes[mesh].primitives[0].indices = ai;
+    model.meshes[mesh].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
 
-    int mat = model->materials.size();
-    model->meshes[mesh].primitives[0].material = mat;
-    model->materials.push_back({});
-    model->materials[mat].name = name + " material";
-    model->materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
-    model->materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
-    model->materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
-    model->materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
+    int mat = model.materials.size();
+    model.meshes[mesh].primitives[0].material = mat;
+    model.materials.push_back({});
+    model.materials[mat].name = name + " material";
+    model.materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
+    model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
+    model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
+    model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
 
     if(hasTexture)
     {
-        int bt = addBuffer(model, texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord");
-        int vt = addBufferView(model, bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord");
+        int bt = addBuffer(texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord");
+        int vt = addBufferView(bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord");
         minMaxVec(texCoords2, 2, tmin, tmax);
-        int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
-        model->meshes[mesh].primitives[0].attributes["TEXCOORD_0"] = at;
+        int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
+        model.meshes[mesh].primitives[0].attributes["TEXCOORD_0"] = at;
         bool repU = info.textureOptions & 1;
         bool repV = info.textureOptions & 2;
         bool interp = info.textureOptions & 4;
-        int sampler = model->samplers.size();
-        model->samplers.push_back({});
-        model->samplers[sampler].magFilter = interp ? TINYGLTF_TEXTURE_FILTER_LINEAR : TINYGLTF_TEXTURE_FILTER_NEAREST;
-        model->samplers[sampler].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
-        model->samplers[sampler].wrapS = repU ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
-        model->samplers[sampler].wrapT = repV ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
-        int tex = model->textures.size();
-        model->textures.push_back({});
-        model->textures[tex].name = name + " texture";
-        model->textures[tex].sampler = sampler;
-        model->textures[tex].source = addImage(model, info.textureId, info.texture, info.textureRes, name);
-        model->materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
-        model->materials[mat].pbrMetallicRoughness.baseColorTexture.index = tex;
+        int sampler = model.samplers.size();
+        model.samplers.push_back({});
+        model.samplers[sampler].magFilter = interp ? TINYGLTF_TEXTURE_FILTER_LINEAR : TINYGLTF_TEXTURE_FILTER_NEAREST;
+        model.samplers[sampler].minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
+        model.samplers[sampler].wrapS = repU ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
+        model.samplers[sampler].wrapT = repV ? TINYGLTF_TEXTURE_WRAP_REPEAT : TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE;
+        int tex = model.textures.size();
+        model.textures.push_back({});
+        model.textures[tex].name = name + " texture";
+        model.textures[tex].sampler = sampler;
+        model.textures[tex].source = addImage(info.textureId, info.texture, info.textureRes, name);
+        model.materials[mat].pbrMetallicRoughness.baseColorTexture.texCoord = 0; // will use TEXCOORD_0
+        model.materials[mat].pbrMetallicRoughness.baseColorTexture.index = tex;
         releaseBuffer(info.textureCoords);
         releaseBuffer(info.texture);
     }
@@ -599,13 +575,12 @@ int addMesh(tinygltf::Model *model, int handle, const std::string &name)
 
 void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, exportShape_out *out)
 {
-    auto model = getModel(in->handle);
     simInt obj = in->shapeHandle;
-    out->nodeIndex = model->nodes.size();
-    model->nodes.push_back({});
-    model->nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
-    model->nodes[out->nodeIndex].name = getObjectName(obj);
-    getGLTFPose(obj, in->parentHandle, model->nodes[out->nodeIndex]);
+    out->nodeIndex = model.nodes.size();
+    model.nodes.push_back({});
+    model.nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
+    model.nodes[out->nodeIndex].name = getObjectName(obj);
+    getGLTFPose(obj, in->parentHandle, model.nodes[out->nodeIndex]);
 
     if(isCompound(obj))
     {
@@ -614,7 +589,6 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
             if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
             {
                 exportShape_in args;
-                args.handle = in->handle;
                 args.shapeHandle = subObj;
                 args.parentHandle = obj;
                 args.parentNodeIndex = out->nodeIndex;
@@ -626,19 +600,17 @@ void exportShape(SScriptCallBack *p, const char *cmd, exportShape_in *in, export
         return;
     }
 
-    model->nodes[out->nodeIndex].mesh = addMesh(model, obj, model->nodes[out->nodeIndex].name);
+    model.nodes[out->nodeIndex].mesh = addMesh(obj, model.nodes[out->nodeIndex].name);
 }
 
 void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, exportObject_out *out)
 {
-    auto model = getModel(in->handle);
     simInt visibleLayers = getVisibleLayers();
     simInt obj = in->objectHandle;
 
     if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
     {
         exportShape_in args;
-        args.handle = in->handle;
         args.shapeHandle = obj;
         exportShape_out ret;
         exportShape(p, &args, &ret);
@@ -646,20 +618,20 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
     }
     if(isCamera(obj))
     {
-        int cameraIndex = model->cameras.size();
-        model->cameras.push_back({});
-        model->cameras.back().type = "perspective";
-        model->cameras.back().perspective.aspectRatio = 16/9.;
+        int cameraIndex = model.cameras.size();
+        model.cameras.push_back({});
+        model.cameras.back().type = "perspective";
+        model.cameras.back().perspective.aspectRatio = 16/9.;
         simFloat a;
         if(simGetObjectFloatParameter(obj, sim_camerafloatparam_perspective_angle, &a) == 1)
-            model->cameras.back().perspective.yfov = a;
-        model->cameras.back().perspective.znear = 0.001;
-        model->cameras.back().perspective.zfar = 1000;
-        out->nodeIndex = model->nodes.size();
-        model->nodes.push_back({});
-        model->nodes[out->nodeIndex].camera = cameraIndex;
-        model->nodes[out->nodeIndex].name = getObjectName(obj);
-        getGLTFPose(obj, -1, model->nodes[out->nodeIndex]);
+            model.cameras.back().perspective.yfov = a;
+        model.cameras.back().perspective.znear = 0.001;
+        model.cameras.back().perspective.zfar = 1000;
+        out->nodeIndex = model.nodes.size();
+        model.nodes.push_back({});
+        model.nodes[out->nodeIndex].camera = cameraIndex;
+        model.nodes[out->nodeIndex].name = getObjectName(obj);
+        getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
     }
 
     nodeIndex[obj] = out->nodeIndex;
@@ -683,9 +655,7 @@ void getAllObjects(std::vector<simInt> &v)
 
 void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *in, exportAllObjects_out *out)
 {
-    auto model = getModel(in->handle);
     exportObjects_in args;
-    args.handle = in->handle;
     getAllObjects(args.objectHandles);
     if(args.objectHandles.empty()) return;
     exportObjects_out ret;
@@ -694,9 +664,7 @@ void exportAllObjects(SScriptCallBack *p, const char *cmd, exportAllObjects_in *
 
 void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedObjects_in *in, exportSelectedObjects_out *out)
 {
-    auto model = getModel(in->handle);
     exportObjects_in args;
-    args.handle = in->handle;
     getObjectSelection(args.objectHandles);
     if(args.objectHandles.empty()) return;
     exportObjects_out ret;
@@ -705,12 +673,10 @@ void exportSelectedObjects(SScriptCallBack *p, const char *cmd, exportSelectedOb
 
 void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, exportObjects_out *out)
 {
-    auto model = getModel(in->handle);
     exportObject_in args;
     exportObject_out ret;
     for(simInt obj : in->objectHandles)
     {
-        args.handle = in->handle;
         args.objectHandle = obj;
         exportObject(p, &args, &ret);
     }
@@ -718,19 +684,17 @@ void exportObjects(SScriptCallBack *p, const char *cmd, exportObjects_in *in, ex
 
 void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in, exportAnimation_out *out)
 {
-    auto model = getModel(in->handle);
-
-    model->animations.resize(1);
+    model.animations.resize(1);
 
     // create time buffer:
     int n = frames.size();
     std::vector<simFloat> t(n);
     for(int i = 0; i < n; i++) t[i] = frames[i].time;
-    int bt = addBuffer(model, t.data(), sizeof(simFloat) * n, "time");
-    int vt = addBufferView(model, bt, sizeof(simFloat) * n, 0, "time");
+    int bt = addBuffer(t.data(), sizeof(simFloat) * n, "time");
+    int vt = addBufferView(bt, sizeof(simFloat) * n, 0, "time");
     std::vector<double> tmin, tmax;
     minMaxVec(t, 1, tmin, tmax);
-    int at = addAccessor(model, vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
+    int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
     for(simInt handle : handles)
     {
@@ -741,16 +705,16 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         }
 
         // for each object we need two channels: translation and rotation
-        int ip = model->animations[0].channels.size();
-        model->animations[0].channels.push_back({});
-        model->animations[0].samplers.push_back({});
-        int ir = model->animations[0].channels.size();
-        model->animations[0].channels.push_back({});
-        model->animations[0].samplers.push_back({});
+        int ip = model.animations[0].channels.size();
+        model.animations[0].channels.push_back({});
+        model.animations[0].samplers.push_back({});
+        int ir = model.animations[0].channels.size();
+        model.animations[0].channels.push_back({});
+        model.animations[0].samplers.push_back({});
         // XXX: animate visibility with scale channel
-        int is = model->animations[0].channels.size();
-        model->animations[0].channels.push_back({});
-        model->animations[0].samplers.push_back({});
+        int is = model.animations[0].channels.size();
+        model.animations[0].channels.push_back({});
+        model.animations[0].samplers.push_back({});
 
         // create translation and rotation buffers:
         std::string name = getObjectName(handle);
@@ -766,43 +730,43 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
                 s[3 * i + j] = frames[i].poses[hi].visible ? 1.0 : 0.0;
         }
 
-        int bp = addBuffer(model, p.data(), sizeof(simFloat) * n * 3, name + " position");
-        int vp = addBufferView(model, bp, sizeof(simFloat) * n * 3, 0, name + " position");
+        int bp = addBuffer(p.data(), sizeof(simFloat) * n * 3, name + " position");
+        int vp = addBufferView(bp, sizeof(simFloat) * n * 3, 0, name + " position");
         std::vector<double> pmin, pmax;
         minMaxVec(p, 3, pmin, pmax);
-        int ap = addAccessor(model, vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
+        int ap = addAccessor(vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
-        int br = addBuffer(model, r.data(), sizeof(simFloat) * n * 4, name + " rotation");
-        int vr = addBufferView(model, br, sizeof(simFloat) * n * 4, 0, name + " rotation");
+        int br = addBuffer(r.data(), sizeof(simFloat) * n * 4, name + " rotation");
+        int vr = addBufferView(br, sizeof(simFloat) * n * 4, 0, name + " rotation");
         std::vector<double> rmin, rmax;
         minMaxVec(r, 4, rmin, rmax);
-        int ar = addAccessor(model, vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
+        int ar = addAccessor(vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
-        int bs = addBuffer(model, s.data(), sizeof(simFloat) * n * 3, name + " scale");
-        int vs = addBufferView(model, bs, sizeof(simFloat) * n * 3, 0, name + " scale");
+        int bs = addBuffer(s.data(), sizeof(simFloat) * n * 3, name + " scale");
+        int vs = addBufferView(bs, sizeof(simFloat) * n * 3, 0, name + " scale");
         std::vector<double> smin, smax;
         minMaxVec(s, 3, smin, smax);
-        int as = addAccessor(model, vs, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
+        int as = addAccessor(vs, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
 
         // create samplers & channels:
-        model->animations[0].samplers[ip].interpolation = "STEP";
-        model->animations[0].samplers[ip].input = at;
-        model->animations[0].samplers[ip].output = ap;
-        model->animations[0].channels[ip].sampler = ip;
-        model->animations[0].channels[ip].target_node = nodeIndex[handle];
-        model->animations[0].channels[ip].target_path = "translation";
-        model->animations[0].samplers[ir].interpolation = "STEP";
-        model->animations[0].samplers[ir].input = at;
-        model->animations[0].samplers[ir].output = ar;
-        model->animations[0].channels[ir].sampler = ir;
-        model->animations[0].channels[ir].target_node = nodeIndex[handle];
-        model->animations[0].channels[ir].target_path = "rotation";
-        model->animations[0].samplers[is].interpolation = "STEP";
-        model->animations[0].samplers[is].input = at;
-        model->animations[0].samplers[is].output = as;
-        model->animations[0].channels[is].sampler = is;
-        model->animations[0].channels[is].target_node = nodeIndex[handle];
-        model->animations[0].channels[is].target_path = "scale";
+        model.animations[0].samplers[ip].interpolation = "STEP";
+        model.animations[0].samplers[ip].input = at;
+        model.animations[0].samplers[ip].output = ap;
+        model.animations[0].channels[ip].sampler = ip;
+        model.animations[0].channels[ip].target_node = nodeIndex[handle];
+        model.animations[0].channels[ip].target_path = "translation";
+        model.animations[0].samplers[ir].interpolation = "STEP";
+        model.animations[0].samplers[ir].input = at;
+        model.animations[0].samplers[ir].output = ar;
+        model.animations[0].channels[ir].sampler = ir;
+        model.animations[0].channels[ir].target_node = nodeIndex[handle];
+        model.animations[0].channels[ir].target_path = "rotation";
+        model.animations[0].samplers[is].interpolation = "STEP";
+        model.animations[0].samplers[is].input = at;
+        model.animations[0].samplers[is].output = as;
+        model.animations[0].channels[is].sampler = is;
+        model.animations[0].channels[is].target_node = nodeIndex[handle];
+        model.animations[0].channels[is].target_path = "scale";
     }
 }
 

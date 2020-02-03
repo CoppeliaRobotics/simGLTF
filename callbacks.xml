@@ -4,28 +4,8 @@
 <plugin name="glTF" short-name="GLTF" author="federico.ferri.it@gmail.com">
     <description>Plugin for glTF format support</description>
     <command name="clear">
-        <description>Clear internal cache. Call this before export.</description>
+        <description>Clear all data stored in memory (geometry, material, animation, cache).</description>
         <params>
-        </params>
-        <return>
-        </return>
-    </command>
-    <command name="create">
-        <description>Create an empty glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
-        <params>
-        </params>
-        <return>
-            <param name="handle" type="string">
-                <description>a handle to the model</description>
-            </param>
-        </return>
-    </command>
-    <command name="destroy">
-        <description>Destroy an existing glTF model.</description>
-        <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
         </params>
         <return>
         </return>
@@ -36,8 +16,8 @@
             <param name="filepath" type="string" />
         </params>
         <return>
-            <param name="handle" type="string">
-                <description>a handle to the model, or empty if error</description>
+            <param name="result" type="bool">
+                <description>true if success</description>
             </param>
             <param name="warnings" type="string">
                 <description>warning message(s)</description>
@@ -53,8 +33,8 @@
             <param name="filepath" type="string" />
         </params>
         <return>
-            <param name="handle" type="string">
-                <description>a handle to the model, or empty if error</description>
+            <param name="result" type="bool">
+                <description>true if success</description>
             </param>
             <param name="warnings" type="string">
                 <description>warning message(s)</description>
@@ -67,33 +47,28 @@
     <command name="saveASCII">
         <description>Save a glTF model to an ASCII file.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
             <param name="filepath" type="string" />
         </params>
         <return>
-            <param name="success" type="bool" />
+            <param name="result" type="bool">
+                <description>true if success</description>
+            </param>
         </return>
     </command>
     <command name="saveBinary">
         <description>Save a glTF model to a binary file.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
             <param name="filepath" type="string" />
         </params>
         <return>
-            <param name="success" type="bool" />
+            <param name="result" type="bool">
+                <description>true if success</description>
+            </param>
         </return>
     </command>
     <command name="serialize">
         <description>Serialize glTF model to JSON string.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
         </params>
         <return>
             <param name="json" type="string">
@@ -104,9 +79,6 @@
     <command name="exportShape">
         <description>Export shape to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
             <param name="shapeHandle" type="int">
                 <description>handle of the shape</description>
             </param>
@@ -126,9 +98,6 @@
     <command name="exportObject">
         <description>Export object to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
             <param name="objectHandle" type="int">
                 <description>handle of the object</description>
             </param>
@@ -145,9 +114,6 @@
     <command name="exportAllObjects">
         <description>Export all objects to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
         </params>
         <return>
         </return>
@@ -155,9 +121,6 @@
     <command name="exportSelectedObjects">
         <description>Export selected objects to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
         </params>
         <return>
         </return>
@@ -165,9 +128,6 @@
     <command name="exportObjects">
         <description>Export objects to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
             <param name="objectHandles" type="table" item-type="int">
                 <description>handles of the objects</description>
             </param>
@@ -178,9 +138,6 @@
     <command name="exportAnimation">
         <description>Export animation data to glTF model.</description>
         <params>
-            <param name="handle" type="string">
-                <description>handle to the model</description>
-            </param>
         </params>
         <return>
         </return>
