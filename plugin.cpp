@@ -18,6 +18,8 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "external/tinygltf/tiny_gltf.h"
 
+using simUID = simInt;
+
 struct simPose3D
 {
     simInt handle;
@@ -28,12 +30,11 @@ struct simPose3D
     void get(int handle, int relTo);
 };
 
-struct simAnimFrame
+struct simAnimTrack
 {
-    simFloat time;
-    std::vector<simPose3D> poses;
-
-    void read(simFloat time, const std::vector<int> &handles);
+    simUID uid;
+    int nodeIndex;
+    std::map<size_t, simPose3D> track;
 };
 
 tinygltf::TinyGLTF gltf;
@@ -42,10 +43,8 @@ tinygltf::Model model;
 std::map<int, int> textureMap;
 
 // for animation data:
-std::vector<int> handles;
-std::map<int, size_t> handleIndex;
-std::vector<simAnimFrame> frames;
-std::map<int, size_t> nodeIndex;
+std::map<simUID, simAnimTrack> frames;
+std::vector<simFloat> times;
 
 // for messages:
 const int error = 0;
@@ -206,15 +205,6 @@ void simPose3D::get(int handle, int relTo)
     visible = isVisible(handle) && !isWireframe(handle);
 }
 
-void simAnimFrame::read(simFloat time, const std::vector<int> &handles)
-{
-    this->time = time;
-    poses.resize(handles.size());
-    size_t i = 0;
-    for(const auto &handle : handles)
-        poses[i++].get(handle, -1);
-}
-
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
 {
@@ -290,7 +280,6 @@ void addMessage(int level, std::string const &fmt, Arguments&&... args)
 
 void clear(SScriptCallBack *p, const char *cmd, clear_in *in, clear_out *out)
 {
-    nodeIndex.clear();
     textureMap.clear();
 
     model.accessors.clear();
@@ -327,6 +316,16 @@ void clear(SScriptCallBack *p, const char *cmd, clear_in *in, clear_out *out)
     model.scenes[0].nodes = {0};
 
     model.defaultScene = 0;
+
+    frames.clear();
+    times.clear();
+}
+
+void clear()
+{
+    clear_in args;
+    clear_out ret;
+    clear(nullptr, &args, &ret);
 }
 
 void loadASCII(SScriptCallBack *p, const char *cmd, loadASCII_in *in, loadASCII_out *out)
@@ -633,8 +632,6 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         model.nodes[out->nodeIndex].name = getObjectName(obj);
         getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
     }
-
-    nodeIndex[obj] = out->nodeIndex;
 }
 
 void getAllObjects(std::vector<simInt> &v)
@@ -687,22 +684,16 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
     model.animations.resize(1);
 
     // create time buffer:
-    int n = frames.size();
-    std::vector<simFloat> t(n);
-    for(int i = 0; i < n; i++) t[i] = frames[i].time;
-    int bt = addBuffer(t.data(), sizeof(simFloat) * n, "time");
+    int n = times.size();
+    int bt = addBuffer(times.data(), sizeof(simFloat) * n, "time");
     int vt = addBufferView(bt, sizeof(simFloat) * n, 0, "time");
     std::vector<double> tmin, tmax;
-    minMaxVec(t, 1, tmin, tmax);
+    minMaxVec(times, 1, tmin, tmax);
     int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
-    for(simInt handle : handles)
+    for(auto &frame : frames)
     {
-        if(nodeIndex.find(handle) == nodeIndex.end())
-        {
-            addMessage(error, "error: object with handle %d (%s) has no corresponding node", handle, getObjectName(handle));
-            continue;
-        }
+        simAnimTrack &track = frame.second;
 
         // for each object we need two channels: translation and rotation
         int ip = model.animations[0].channels.size();
@@ -717,17 +708,17 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         model.animations[0].samplers.push_back({});
 
         // create translation and rotation buffers:
-        std::string name = getObjectName(handle);
+        std::string name = model.nodes[track.nodeIndex].name;
         std::vector<simFloat> p(n * 3), r(n * 4), s(n * 3);
-        int hi = handleIndex[handle];
         for(int i = 0; i < n; i++)
         {
+            bool exists = track.track.find(i) != track.track.end();
             for(int j = 0; j < 3; j++)
-                p[3 * i + j] = frames[i].poses[hi].position[j];
+                p[3 * i + j] = exists ? track.track[i].position[j] : 0.0;
             for(int j = 0; j < 4; j++)
-                r[4 * i + j] = frames[i].poses[hi].orientation[j];
+                r[4 * i + j] = exists ? track.track[i].orientation[j] : 0.0;
             for(int j = 0; j < 3; j++)
-                s[3 * i + j] = frames[i].poses[hi].visible ? 1.0 : 0.0;
+                s[3 * i + j] = exists && track.track[i].visible ? 1.0 : 0.0;
         }
 
         int bp = addBuffer(p.data(), sizeof(simFloat) * n * 3, name + " position");
@@ -753,19 +744,19 @@ void exportAnimation(SScriptCallBack *p, const char *cmd, exportAnimation_in *in
         model.animations[0].samplers[ip].input = at;
         model.animations[0].samplers[ip].output = ap;
         model.animations[0].channels[ip].sampler = ip;
-        model.animations[0].channels[ip].target_node = nodeIndex[handle];
+        model.animations[0].channels[ip].target_node = track.nodeIndex;
         model.animations[0].channels[ip].target_path = "translation";
         model.animations[0].samplers[ir].interpolation = "STEP";
         model.animations[0].samplers[ir].input = at;
         model.animations[0].samplers[ir].output = ar;
         model.animations[0].channels[ir].sampler = ir;
-        model.animations[0].channels[ir].target_node = nodeIndex[handle];
+        model.animations[0].channels[ir].target_node = track.nodeIndex;
         model.animations[0].channels[ir].target_path = "rotation";
         model.animations[0].samplers[is].interpolation = "STEP";
         model.animations[0].samplers[is].input = at;
         model.animations[0].samplers[is].output = as;
         model.animations[0].channels[is].sampler = is;
-        model.animations[0].channels[is].target_node = nodeIndex[handle];
+        model.animations[0].channels[is].target_node = track.nodeIndex;
         model.animations[0].channels[is].target_path = "scale";
     }
 }
@@ -777,12 +768,7 @@ void animationFrameCount(SScriptCallBack *p, const char *cmd, animationFrameCoun
 
 void initAnimationFrames()
 {
-    handles.clear();
-    handleIndex.clear();
-    frames.clear();
-    getAllObjects(handles);
-    for(int i = 0; i < handles.size(); i++)
-        handleIndex[handles[i]] = i;
+    clear();
 }
 
 void readAnimationFrame()
@@ -790,12 +776,28 @@ void readAnimationFrame()
     if(simGetSimulationState() != sim_simulation_advancing_running)
         return;
 
-    simFloat t = simGetSimulationTime();
-    if(!frames.empty() && t < frames.back().time + 0.001)
-        return;
+    simFloat time = simGetSimulationTime();
+    size_t timeIndex = times.size();
+    times.push_back(time);
 
-    frames.push_back({});
-    frames.back().read(t, handles);
+    std::vector<int> allObjects;
+    getAllObjects(allObjects);
+    for(int handle : allObjects)
+    {
+        simUID uid;
+        if(simGetObjectUniqueIdentifier(handle, &uid) == -1) continue;
+        auto it = frames.find(uid);
+        if(it == frames.end())
+        {
+            exportObject_in args;
+            exportObject_out ret;
+            args.objectHandle = handle;
+            exportObject(nullptr, &args, &ret);
+            frames[uid].nodeIndex = ret.nodeIndex;
+        }
+
+        frames[uid].track[timeIndex].get(handle, -1);
+    }
 }
 
 class Plugin : public sim::Plugin
