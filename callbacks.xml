@@ -102,9 +102,6 @@
                 <description>handle of the object</description>
             </param>
         </params>
-            <param name="nodeIndex" type="int">
-                <description>index of the new node (may contain sub-nodes)</description>
-            </param>
         <return>
             <param name="nodeIndex" type="int">
                 <description>index of the new node (may contain sub-nodes)</description>
