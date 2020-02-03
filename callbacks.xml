@@ -149,4 +149,14 @@
             </param>
         </return>
     </command>
+    <command name="recordAnimation">
+        <description>Export animation data to glTF model.</description>
+        <params>
+            <param name="enable" type="bool">
+                <description>if true the plugin will record the pose of all objects during simulation</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
 </plugin>

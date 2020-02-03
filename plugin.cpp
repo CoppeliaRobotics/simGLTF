@@ -45,6 +45,7 @@ std::map<int, int> textureMap;
 // for animation data:
 std::map<simUID, simAnimTrack> frames;
 std::vector<simFloat> times;
+bool recordAnimationFlag = false;
 
 // for messages:
 const int error = 0;
@@ -766,6 +767,11 @@ void animationFrameCount(SScriptCallBack *p, const char *cmd, animationFrameCoun
     out->count = frames.size();
 }
 
+void recordAnimation(SScriptCallBack *p, const char *cmd, recordAnimation_in *in, recordAnimation_out *out)
+{
+    recordAnimationFlag = in->enable;
+}
+
 void initAnimationFrames()
 {
     clear();
@@ -773,7 +779,7 @@ void initAnimationFrames()
 
 void readAnimationFrame()
 {
-    if(simGetSimulationState() != sim_simulation_advancing_running)
+    if(!recordAnimationFlag || simGetSimulationState() != sim_simulation_advancing_running)
         return;
 
     simFloat time = simGetSimulationTime();
