@@ -5,7 +5,6 @@ local fileName=sim.fileDialog(sim.filedlg_type_save,'Export to glTF...',scenePat
 if fileName==nil then return end
 local exportAnimation=simGLTF.animationFrameCount()>0 and sim.msgBox(sim.msgbox_type_question,sim.msgbox_buttons_yesno,'Export to glTF...','Export animation content from last simulation run?')==sim.msgbox_return_yes
 if exportAnimation then
-    -- cleared automatically on simulation start
     simGLTF.exportAnimation()
 else
     simGLTF.clear()
