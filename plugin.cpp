@@ -56,6 +56,14 @@ const int trace = 4;
 int verboseLevel = warn;
 int bufferPreviewSize = 0;
 
+namespace sim
+{
+    template<> std::string Handle<tinygltf::Model>::tag()
+    {
+        return PLUGIN_NAME ".model";
+    }
+} // namespace sim
+
 using sim::Handle;
 
 bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
@@ -227,11 +235,6 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
         out << "\b\b]";
     }
     return out;
-}
-
-template<> std::string Handle<tinygltf::Model>::tag()
-{
-    return PLUGIN_NAME ".model";
 }
 
 tinygltf::Model * getModel(const std::string &handle)
