@@ -19,7 +19,42 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "external/tinygltf/tiny_gltf.h"
 
+struct simPose3D
+{
+    simInt handle;
+    simFloat position[3];
+    simFloat orientation[4];
+    bool visible;
+
+    void get(int handle, int relTo);
+};
+
+struct simAnimFrame
+{
+    simFloat time;
+    std::vector<simPose3D> poses;
+
+    void read(simFloat time, const std::vector<int> &handles);
+};
+
 tinygltf::TinyGLTF gltf;
+
+std::map<int, int> textureMap;
+
+// for animation data:
+std::vector<int> handles;
+std::map<int, size_t> handleIndex;
+std::vector<simAnimFrame> frames;
+std::map<int, size_t> nodeIndex;
+
+// for messages:
+const int error = 0;
+const int warn = 1;
+const int info = 2;
+const int debug = 3;
+const int trace = 4;
+int verboseLevel = warn;
+int bufferPreviewSize = 0;
 
 using sim::Handle;
 
@@ -165,53 +200,22 @@ std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
     return ret;
 }
 
-struct simPose3D
+void simPose3D::get(int handle, int relTo)
 {
-    simInt handle;
-    simFloat position[3];
-    simFloat orientation[4];
-    bool visible;
+    this->handle = handle;
+    simGetObjectPosition(handle, relTo, &position[0]);
+    simGetObjectQuaternion(handle, relTo, &orientation[0]);
+    visible = isVisible(handle) && !isWireframe(handle);
+}
 
-    void get(int handle, int relTo)
-    {
-        this->handle = handle;
-        simGetObjectPosition(handle, relTo, &position[0]);
-        simGetObjectQuaternion(handle, relTo, &orientation[0]);
-        visible = isVisible(handle) && !isWireframe(handle);
-    }
-};
-
-struct simAnimFrame
+void simAnimFrame::read(simFloat time, const std::vector<int> &handles)
 {
-    simFloat time;
-    std::vector<simPose3D> poses;
-
-    void read(simFloat time, const std::vector<int> &handles)
-    {
-        this->time = time;
-        poses.resize(handles.size());
-        size_t i = 0;
-        for(const auto &handle : handles)
-            poses[i++].get(handle, -1);
-    }
-};
-
-std::map<int, int> textureMap;
-
-// for animation data:
-std::vector<int> handles;
-std::map<int, size_t> handleIndex;
-std::vector<simAnimFrame> frames;
-std::map<int, size_t> nodeIndex;
-
-// for messages:
-const int error = 0;
-const int warn = 1;
-const int info = 2;
-const int debug = 3;
-const int trace = 4;
-int verboseLevel = warn;
-int bufferPreviewSize = 0;
+    this->time = time;
+    poses.resize(handles.size());
+    size_t i = 0;
+    for(const auto &handle : handles)
+        poses[i++].get(handle, -1);
+}
 
 template <typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
