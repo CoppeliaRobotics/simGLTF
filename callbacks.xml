@@ -82,7 +82,7 @@
             <param name="shapeHandle" type="int">
                 <description>handle of the shape</description>
             </param>
-            <param name="parentHandle" type="int">
+            <param name="parentHandle" type="int" default="-1">
                 <description>handle of the parent object. if specified the matrix of the node will be relative to this. use this in conjunction with parentNodeIndex parameter.</description>
             </param>
             <param name="parentNodeIndex" type="int" default="0">
