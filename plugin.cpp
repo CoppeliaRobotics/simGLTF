@@ -168,6 +168,12 @@ bool isCamera(simInt handle)
     return objType == sim_object_camera_type;
 }
 
+bool isLight(simInt handle)
+{
+    simInt objType = simGetObjectType(handle);
+    return objType == sim_object_light_type;
+}
+
 std::vector<simInt> ungroupShape(simInt handle)
 {
     std::vector<simInt> ret;
@@ -632,6 +638,19 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         model.nodes[out->nodeIndex].camera = cameraIndex;
         model.nodes[out->nodeIndex].name = getObjectName(obj);
         getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
+    }
+    if(isLight(obj))
+    {
+        int lightIndex = model.lights.size();
+        model.lights.push_back({});
+        model.lights[lightIndex].name = getObjectName(obj);
+        simFloat diffuse[3], specular[3];
+        if(simGetLightParameters(obj, nullptr, &diffuse[0], &specular[0]) != -1)
+            model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
+        model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
+        model.lights[lightIndex].type = "point"; // FIXME: where to get this value from sim?
+        model.lights[lightIndex].range = 1.0; // FIXME: where to get this value from sim?
+        out->nodeIndex = lightIndex;
     }
 }
 
