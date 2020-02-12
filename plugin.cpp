@@ -622,24 +622,26 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         exportShape(p, &args, &ret);
         out->nodeIndex = ret.nodeIndex;
     }
-    if(isCamera(obj))
+    else if(isCamera(obj))
     {
         int cameraIndex = model.cameras.size();
         model.cameras.push_back({});
-        model.cameras.back().type = "perspective";
-        model.cameras.back().perspective.aspectRatio = 16/9.;
+        model.cameras[cameraIndex].name = getObjectName(obj);
+        model.cameras[cameraIndex].type = "perspective";
+        model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
         simFloat a;
         if(simGetObjectFloatParameter(obj, sim_camerafloatparam_perspective_angle, &a) == 1)
-            model.cameras.back().perspective.yfov = a;
-        model.cameras.back().perspective.znear = 0.001;
-        model.cameras.back().perspective.zfar = 1000;
+            model.cameras[cameraIndex].perspective.yfov = a;
+        model.cameras[cameraIndex].perspective.znear = 0.001;
+        model.cameras[cameraIndex].perspective.zfar = 1000;
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
         model.nodes[out->nodeIndex].camera = cameraIndex;
-        model.nodes[out->nodeIndex].name = getObjectName(obj);
+        model.nodes[out->nodeIndex].name = getObjectName(obj) + " camera node";
+        model.nodes[0].children.push_back(out->nodeIndex);
         getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
     }
-    if(isLight(obj))
+    else if(isLight(obj))
     {
         int lightIndex = model.lights.size();
         model.lights.push_back({});
