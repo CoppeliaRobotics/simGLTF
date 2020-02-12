@@ -636,9 +636,17 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         model.cameras[cameraIndex].perspective.zfar = 1000;
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
-        model.nodes[out->nodeIndex].camera = cameraIndex;
-        model.nodes[out->nodeIndex].name = getObjectName(obj) + " camera node";
         model.nodes[0].children.push_back(out->nodeIndex);
+        int cameraOrientationFixNode = model.nodes.size();
+        model.nodes.push_back({});
+        model.nodes[out->nodeIndex].name = getObjectName(obj) + " camera node";
+        model.nodes[out->nodeIndex].children.push_back(cameraOrientationFixNode);
+        model.nodes[cameraOrientationFixNode].matrix = {-1,  0,  0,  0,
+                                                         0,  1,  0,  0,
+                                                         0,  0, -1,  0,
+                                                         0,  0,  0,  1};
+        model.nodes[cameraOrientationFixNode].camera = cameraIndex;
+        model.nodes[cameraOrientationFixNode].name = getObjectName(obj) + " camera node [rot fix]";
         getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
     }
     else if(isLight(obj))
