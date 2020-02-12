@@ -209,7 +209,7 @@ void simPose3D::get(int handle, int relTo)
     this->handle = handle;
     simGetObjectPosition(handle, relTo, &position[0]);
     simGetObjectQuaternion(handle, relTo, &orientation[0]);
-    visible = isVisible(handle) && !isWireframe(handle);
+    visible = !isShape(handle) || (isVisible(handle) && !isWireframe(handle));
 }
 
 template <typename T>
