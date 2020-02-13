@@ -651,13 +651,30 @@ void exportObject(SScriptCallBack *p, const char *cmd, exportObject_in *in, expo
         int cameraIndex = model.cameras.size();
         model.cameras.push_back({});
         model.cameras[cameraIndex].name = getObjectName(obj);
+#if 0
+        if(getObjectIntParam(obj, sim_cameraintparam_perspective_operation))
+        {
+            model.cameras[cameraIndex].type = "perspective";
+            model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
+            model.cameras[cameraIndex].perspective.yfov = getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
+            model.cameras[cameraIndex].perspective.znear = getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
+            model.cameras[cameraIndex].perspective.zfar = getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+        }
+        else
+        {
+            model.cameras[cameraIndex].type = "orthographic";
+            model.cameras[cameraIndex].orthographic.xmag = getObjectIntParam(obj, sim_cameraintparam_resolution_x);
+            model.cameras[cameraIndex].orthographic.ymag = getObjectIntParam(obj, sim_cameraintparam_resolution_y);
+            model.cameras[cameraIndex].orthographic.znear = getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
+            model.cameras[cameraIndex].orthographic.zfar = getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+        }
+#else
         model.cameras[cameraIndex].type = "perspective";
         model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-        simFloat a;
-        if(simGetObjectFloatParameter(obj, sim_camerafloatparam_perspective_angle, &a) == 1)
-            model.cameras[cameraIndex].perspective.yfov = a;
+        model.cameras[cameraIndex].perspective.yfov = getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
         model.cameras[cameraIndex].perspective.znear = 0.001;
-        model.cameras[cameraIndex].perspective.zfar = 1000;
+        model.cameras[cameraIndex].perspective.zfar = 1000.0;
+#endif
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
         model.nodes[0].children.push_back(out->nodeIndex);
