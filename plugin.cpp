@@ -121,22 +121,46 @@ std::string getObjectName(simInt handle)
     return ret;
 }
 
+simFloat getObjectFloatParam(simInt handle, simInt param)
+{
+    simFloat value;
+    simInt result = simGetObjectFloatParameter(handle, param, &value);
+    if(result == 0) throw std::runtime_error((boost::format("simGetObjectFloatParameter: param %d not found in object %d") % param % handle).str());
+    if(result == 1) return value;
+    throw std::runtime_error("simGetObjectFloatParameter: error");
+}
+
+simInt getObjectIntParam(simInt handle, simInt param)
+{
+    simInt value;
+    simInt result = simGetObjectInt32Parameter(handle, param, &value);
+    if(result == 0) throw std::runtime_error((boost::format("simGetObjectInt32Parameter: param %d not found in object %d") % param % handle).str());
+    if(result == 1) return value;
+    throw std::runtime_error("simGetObjectInt32Parameter: error");
+}
+
 simInt getObjectLayers(simInt handle)
 {
-    simInt v = 0;
-    if(simGetObjectInt32Parameter(handle, sim_objintparam_visibility_layer, &v) == 1)
-        return v;
-    else
+    try
+    {
+        return getObjectIntParam(handle, sim_objintparam_visibility_layer);
+    }
+    catch(...)
+    {
         return 0;
+    }
 }
 
 bool is(simInt handle, simInt param)
 {
-    simInt v = 0;
-    if(simGetObjectInt32Parameter(handle, param, &v) == 1)
-        return v != 0;
-    else
+    try
+    {
+        return getObjectIntParam(handle, param) != 0;
+    }
+    catch(...)
+    {
         return false;
+    }
 }
 
 bool isCompound(simInt handle)
