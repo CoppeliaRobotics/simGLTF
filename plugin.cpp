@@ -890,8 +890,8 @@ public:
         char *ps = std::getenv("COPPELIASIM_GLTF_BUFFER_PREVIEW");
         if(ps) bufferPreviewSize = std::atoi(ps);
 
-        simSetModuleInfo(PLUGIN_NAME, 0, "glTF support", 0);
-        simSetModuleInfo(PLUGIN_NAME, 1, BUILD_DATE, 0);
+        setExtVersion("glTF support");
+        setBuildDate(BUILD_DATE);
     }
 
     void onSimulationAboutToStart()
