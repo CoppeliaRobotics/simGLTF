@@ -10,6 +10,7 @@
 
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
 #define TINYGLTF_IMPLEMENTATION
@@ -54,9 +55,6 @@ public:
     {
         if(!registerScriptStuff())
             throw std::runtime_error("failed to register script stuff");
-
-        char *vl = std::getenv("COPPELIASIM_GLTF_VERBOSE");
-        if(vl) verboseLevel = std::atoi(vl);
 
         char *ps = std::getenv("COPPELIASIM_GLTF_BUFFER_PREVIEW");
         if(ps) bufferPreviewSize = std::atoi(ps);
@@ -255,19 +253,6 @@ public:
         p->visible = !isShape(handle) || (isVisible(handle) && !isWireframe(handle));
     }
 
-    void addMessage(int level, const std::string &message)
-    {
-        if(level > verboseLevel) return;
-        std::string m = "glTF: " + message;
-        simAddStatusbarMessage(m.c_str());
-        std::cerr << m << std::endl;
-    }
-
-    void addMessageFmt(int level, const boost::format &format)
-    {
-        addMessage(level, format.str());
-    }
-
     std::string buf2str(const void *data, size_t size)
     {
         auto b = reinterpret_cast<const unsigned char*>(data);
@@ -292,28 +277,6 @@ public:
         dataPreview += (boost::format("(%d bytes)") % size).str();
 
         return dataPreview;
-    }
-
-    template<class T, class... Args>
-    void addMessageFmt(int level, boost::format &format, T &&t, Args&&... args)
-    {
-        return addMessageFmt(level, format % std::forward<T>(t), std::forward<Args>(args)...);
-    }
-
-    template<typename... Arguments>
-    void addMessage(int level, std::string const &fmt, Arguments&&... args)
-    {
-        try
-        {
-            boost::format format(fmt);
-            addMessageFmt(level, format, std::forward<Arguments>(args)...);
-        }
-        catch(boost::io::too_many_args &ex)
-        {
-            std::string s = fmt;
-            s += " (error during formatting)";
-            addMessage(level, s);
-        }
     }
 
     void clear(clear_in *in, clear_out *out)
@@ -399,7 +362,7 @@ public:
         model.buffers.push_back({});
         model.buffers[i].data.resize(size);
         model.buffers[i].name = name + " buffer";
-        addMessage(debug, "addBuffer: added buffer '%s' %s", name, buf2str(buffer, size));
+        log(sim_verbosity_debug, boost::format("addBuffer: added buffer '%s' %s") % name % buf2str(buffer, size));
         std::memcpy(model.buffers[i].data.data(), buffer, size);
         return i;
     }
@@ -475,10 +438,10 @@ public:
     {
         if(textureMap.find(id) != textureMap.end())
         {
-            addMessage(debug, "addImage: texture with id %d already loaded at index %d", id, textureMap[id]);
+            log(sim_verbosity_debug, boost::format("addImage: texture with id %d already loaded at index %d") % id % textureMap[id]);
             return textureMap[id];
         }
-        addMessage(debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
+        log(sim_verbosity_debug, boost::format("addImage: loading texture of object %s with id %d %s") % objname % id % buf2str(imgdata, res[0] * res[1] * 4));
 
         auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
         std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
@@ -493,8 +456,8 @@ public:
         model.images[i].mimeType = "image/bmp";
         model.images[i].name = name;
         textureMap[id] = i;
-        addMessage(debug, "addImage: loaded texture of object %s with id %d at index %d %s", objname, id, i, buf2str(imgdata, res[0] * res[1] * 4));
-        addMessage(trace, "addImage: model now has %d images", model.images.size());
+        log(sim_verbosity_debug, boost::format("addImage: loaded texture of object %s with id %d at index %d %s") % objname % id % i % buf2str(imgdata, res[0] * res[1] * 4));
+        log(sim_verbosity_debug, boost::format("addImage: model now has %d images") % model.images.size());
         return i;
     }
 
@@ -525,13 +488,13 @@ public:
 
     int addMesh(int handle, const std::string &name)
     {
-        addMessage(trace, "addMesh: %s: adding mesh for shape handle %d", name, handle);
+        log(sim_verbosity_debug, boost::format("addMesh: %s: adding mesh for shape handle %d") % name % handle);
 
         struct SShapeVizInfo info;
         simInt result = simGetShapeViz(handle, 0, &info);
         if(result < 1) throw std::runtime_error((boost::format("simGetShapeViz returned %d") % result).str());
         bool hasTexture = result == 2;
-        addMessage(debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
+        log(sim_verbosity_debug, boost::format("addMesh: %s: has texture: %d (result %d)") % name % hasTexture % result);
 
         std::vector<simFloat> vertices2;
         std::vector<simInt> indices2;
@@ -899,13 +862,6 @@ private:
     std::vector<simFloat> times;
     bool recordAnimationFlag = false;
 
-    // for messages:
-    const int error = 0;
-    const int warn = 1;
-    const int info = 2;
-    const int debug = 3;
-    const int trace = 4;
-    int verboseLevel = warn;
     int bufferPreviewSize = 0;
 };
 
