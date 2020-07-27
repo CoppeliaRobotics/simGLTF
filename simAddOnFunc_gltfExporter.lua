@@ -6,4 +6,4 @@ if fileName==nil then return end
 simGLTF.clear()
 simGLTF.exportAllObjects()
 simGLTF.saveASCII(fileName)
-sim.addStatusbarMessage('Exported glTF content to '..fileName)
+sim.addLog(sim.verbosity_infos+sim.verbosity_undecorated,'Exported glTF content to '..fileName)
