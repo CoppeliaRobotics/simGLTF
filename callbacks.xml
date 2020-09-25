@@ -11,7 +11,7 @@
         </return>
     </command>
     <command name="loadASCII">
-        <description>Load an ASCII glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
+        <description>Load an ASCII glTF model. The object must be destroyed later with <command-ref name="destroy" />.</description>
         <params>
             <param name="filepath" type="string" />
         </params>
@@ -28,7 +28,7 @@
         </return>
     </command>
     <command name="loadBinary">
-        <description>Load a binary (.glb) glTF model. The object must be destroyed later with <cmd-ref name="destroy" />.</description>
+        <description>Load a binary (.glb) glTF model. The object must be destroyed later with <command-ref name="destroy" />.</description>
         <params>
             <param name="filepath" type="string" />
         </params>
