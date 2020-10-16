@@ -362,7 +362,7 @@ public:
         model.buffers.push_back({});
         model.buffers[i].data.resize(size);
         model.buffers[i].name = name + " buffer";
-        log(sim_verbosity_debug, boost::format("addBuffer: added buffer '%s' %s") % name % buf2str(buffer, size));
+        sim::addLog(sim_verbosity_debug, "addBuffer: added buffer '%s' %s", name, buf2str(buffer, size));
         std::memcpy(model.buffers[i].data.data(), buffer, size);
         return i;
     }
@@ -438,10 +438,10 @@ public:
     {
         if(textureMap.find(id) != textureMap.end())
         {
-            log(sim_verbosity_debug, boost::format("addImage: texture with id %d already loaded at index %d") % id % textureMap[id]);
+            sim::addLog(sim_verbosity_debug, "addImage: texture with id %d already loaded at index %d", id, textureMap[id]);
             return textureMap[id];
         }
-        log(sim_verbosity_debug, boost::format("addImage: loading texture of object %s with id %d %s") % objname % id % buf2str(imgdata, res[0] * res[1] * 4));
+        sim::addLog(sim_verbosity_debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
 
         auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
         std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
@@ -456,8 +456,8 @@ public:
         model.images[i].mimeType = "image/bmp";
         model.images[i].name = name;
         textureMap[id] = i;
-        log(sim_verbosity_debug, boost::format("addImage: loaded texture of object %s with id %d at index %d %s") % objname % id % i % buf2str(imgdata, res[0] * res[1] * 4));
-        log(sim_verbosity_debug, boost::format("addImage: model now has %d images") % model.images.size());
+        sim::addLog(sim_verbosity_debug, "addImage: loaded texture of object %s with id %d at index %d %s", objname, id, i, buf2str(imgdata, res[0] * res[1] * 4));
+        sim::addLog(sim_verbosity_debug, "addImage: model now has %d images", model.images.size());
         return i;
     }
 
@@ -488,13 +488,13 @@ public:
 
     int addMesh(int handle, const std::string &name)
     {
-        log(sim_verbosity_debug, boost::format("addMesh: %s: adding mesh for shape handle %d") % name % handle);
+        sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
         struct SShapeVizInfo info;
         simInt result = simGetShapeViz(handle, 0, &info);
         if(result < 1) throw std::runtime_error((boost::format("simGetShapeViz returned %d") % result).str());
         bool hasTexture = result == 2;
-        log(sim_verbosity_debug, boost::format("addMesh: %s: has texture: %d (result %d)") % name % hasTexture % result);
+        sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
         std::vector<simFloat> vertices2;
         std::vector<simInt> indices2;
