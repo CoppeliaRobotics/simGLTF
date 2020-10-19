@@ -48,4 +48,6 @@ add_library(simExtGLTF SHARED ${SOURCES} ${COPPELIASIM_EXPORTED_SOURCES})
 target_link_libraries(simExtGLTF ${Boost_LIBRARIES} ${OpenCV_LIBS} ${COPPELIASIM_LIBRARIES})
 
 install(TARGETS simExtGLTF DESTINATION ${COPPELIASIM_PLUGINS_DIR})
+install(FILES simAddOnFunc_gltfExporter.lua DESTINATION ${COPPELIASIM_PLUGINS_DIR})
+install(FILES simAddOnScript-gltfAnimationExporter.lua DESTINATION ${COPPELIASIM_PLUGINS_DIR})
 
