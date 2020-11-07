@@ -48,6 +48,15 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
     return out;
 }
 
+// typedef void stbi_write_func(void *context, void *data, int size);
+static void stbi_write_func_vector(void* context, void* data, int size)
+{
+    for (int i = 0; i < size; ++i)
+    {
+        ((std::vector<unsigned char>*)context)->push_back(*(reinterpret_cast<unsigned char *>(data) + i));
+    }
+}
+
 class Plugin : public sim::Plugin
 {
 public:
@@ -434,6 +443,15 @@ public:
         return buf;
     }
 
+    std::vector<unsigned char> raw2jpg(const unsigned char *data, int res[2], int bytesPerPixel, int quality)
+    {
+        int width = res[0];
+        int height = res[1];
+        std::vector<unsigned char> buffer;
+        auto result = stbi_write_jpg_to_func(to_mem, &buffer, width, height, bytesPerPixel, data, quality);
+        return buffer;
+    }
+
     int addImage(simInt id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
@@ -442,8 +460,10 @@ public:
             return textureMap[id];
         }
         sim::addLog(sim_verbosity_debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
-
+#if 0
         auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
+#endif
+        auto buf = raw2jpg(reinterpret_cast<const unsigned char *>(imgdata), res, 4, 100);
         std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
         int b = addBuffer(buf.data(), buf.size(), name);
