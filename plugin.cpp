@@ -142,7 +142,7 @@ public:
     {
         simFloat value;
         simInt result = simGetObjectFloatParameter(handle, param, &value);
-        if(result == 0) throw std::runtime_error((boost::format("simGetObjectFloatParameter: param %d not found in object %d") % param % handle).str());
+        if(result == 0) throw sim::exception("simGetObjectFloatParameter: param %d not found in object %d", param, handle);
         if(result == 1) return value;
         throw std::runtime_error("simGetObjectFloatParameter: error");
     }
@@ -151,7 +151,7 @@ public:
     {
         simInt value;
         simInt result = simGetObjectInt32Parameter(handle, param, &value);
-        if(result == 0) throw std::runtime_error((boost::format("simGetObjectInt32Parameter: param %d not found in object %d") % param % handle).str());
+        if(result == 0) throw sim::exception("simGetObjectInt32Parameter: param %d not found in object %d", param, handle);
         if(result == 1) return value;
         throw std::runtime_error("simGetObjectInt32Parameter: error");
     }
@@ -492,7 +492,7 @@ public:
 
         struct SShapeVizInfo info;
         simInt result = simGetShapeViz(handle, 0, &info);
-        if(result < 1) throw std::runtime_error((boost::format("simGetShapeViz returned %d") % result).str());
+        if(result < 1) throw sim::exception("simGetShapeViz returned %d", result);
         bool hasTexture = result == 2;
         sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
