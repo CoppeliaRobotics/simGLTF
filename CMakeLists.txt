@@ -39,9 +39,7 @@ coppeliasim_generate_stubs(${CMAKE_CURRENT_BINARY_DIR}/generated XML_FILE ${CMAK
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-set(SOURCES plugin.cpp)
-coppeliasim_add_plugin(simExtGLTF SOURCES ${SOURCES})
+coppeliasim_add_plugin(simExtGLTF SOURCES plugin.cpp)
 target_link_libraries(simExtGLTF Boost::boost)
-
-install(FILES simAddOnFunc_gltfExporter.lua DESTINATION ${COPPELIASIM_PLUGINS_DIR})
-install(FILES simAddOnScript-gltfAnimationExporter.lua DESTINATION ${COPPELIASIM_PLUGINS_DIR})
+coppeliasim_add_addon(simAddOnFunc_gltfExporter.lua)
+coppeliasim_add_addon(simAddOnScript-gltfAnimationExporter.lua)
