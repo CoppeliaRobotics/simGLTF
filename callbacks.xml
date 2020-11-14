@@ -159,4 +159,17 @@
         <return>
         </return>
     </command>
+    <command name="setExportTextureFormat">
+        <description>Set the image format (bmp, png, jpg) in which textures are exported.</description>
+        <params>
+            <param name="format" type="string">
+                <description>texure format (bmp, png, jpg(jpeg))</description>
+            </param>
+        </params>
+        <return>
+            <param name="result" type="bool">
+                <description>false if non-available texture format is passed</description>
+            </param>
+        </return>
+    </command>
 </plugin>

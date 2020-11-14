@@ -12,6 +12,7 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string.hpp>
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -461,6 +462,17 @@ public:
         return buffer;
     }
 
+    std::vector<unsigned char> convertRawImage(const unsigned char *imgdata, int res[2])
+    {
+        if (exportTextureFormat == TextureFormat::BMP)
+            return raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
+        else if (exportTextureFormat == TextureFormat::PNG)
+            return raw2png(reinterpret_cast<const unsigned char *>(imgdata), res, 4, res[0]*4);
+        else if (exportTextureFormat == TextureFormat::JPG)
+            return raw2jpg(reinterpret_cast<const unsigned char *>(imgdata), res, 4, 100);
+        return std::vector<unsigned char>;
+    }
+
     int addImage(simInt id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
@@ -469,11 +481,8 @@ public:
             return textureMap[id];
         }
         sim::addLog(sim_verbosity_debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
-#if 0
-        auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
-        auto buf = raw2png(reinterpret_cast<const unsigned char *>(imgdata), res, 4, res[0]*4);
-#endif
-        auto buf = raw2jpg(reinterpret_cast<const unsigned char *>(imgdata), res, 4, 100);
+
+        auto buf = convertRawImage(reinterpret_cast<const unsigned char *>(imgdata), res);
         std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
         int b = addBuffer(buf.data(), buf.size(), name);
@@ -881,6 +890,30 @@ public:
         }
     }
 
+    void setExportTextureFormat(setExportTextureFormat_in *in, setExportTextureFormat_out *out)
+    {
+        std::string format = in->format;
+        boost::algorithm::to_lower(format);
+        if (format == "bmp")
+        {
+            exportTextureFormat = TextureFormat::BMP;
+        }
+        else if (format == "png")
+        {
+            exportTextureFormat = TextureFormat::PNG;
+        }
+        else if (in->format == "jpg" || in->format == "jpeg")
+        {
+            exportTextureFormat = TextureFormat::JPG;
+        }
+        else
+        {
+            out->result = false; // not available option
+            return;
+        }
+        out->result = true;
+    }
+
 private:
     tinygltf::TinyGLTF gltf;
     tinygltf::Model model;
@@ -893,6 +926,10 @@ private:
     bool recordAnimationFlag = false;
 
     int bufferPreviewSize = 0;
+
+    // for texture format options
+    enum class TextureFormat { BMP, PNG, JPG };
+    TextureFormat exportTextureFormat =  TextureFormat::BMP; // BMP by default
 };
 
 SIM_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, Plugin)
