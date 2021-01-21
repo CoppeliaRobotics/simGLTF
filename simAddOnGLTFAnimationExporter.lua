@@ -1,9 +1,8 @@
-function sysCall_init(manualStart)
-    -- this add-on does not auto-start:
-    if not manualStart then
-        return {cmd='cleanup'}
-    end
+function sysCall_info()
+    return {autoStart=false}
+end
 
+function sysCall_init()
     sim.msgBox(sim.msgbox_type_info,sim.msgbox_buttons_ok,'GLTF Animation Export','GLTF animation export is active. Content of current simulation will be recorded, and will be saved when the simulation will stop.')
     simGLTF.recordAnimation(true)
 end
