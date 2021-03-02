@@ -587,7 +587,7 @@ public:
                 if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
                 {
                     exportShape_in args;
-                    args._scriptID = in->_scriptID;
+                    args._ = in->_;
                     args.shapeHandle = subObj;
                     args.parentHandle = obj;
                     args.parentNodeIndex = out->nodeIndex;
@@ -610,7 +610,7 @@ public:
         if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
         {
             exportShape_in args;
-            args._scriptID = in->_scriptID;
+            args._ = in->_;
             args.shapeHandle = obj;
             exportShape_out ret;
             exportShape(&args, &ret);
@@ -694,7 +694,7 @@ public:
     void exportAllObjects(exportAllObjects_in *in, exportAllObjects_out *out)
     {
         exportObjects_in args;
-        args._scriptID = in->_scriptID;
+        args._ = in->_;
         getAllObjects(args.objectHandles);
         if(args.objectHandles.empty()) return;
         exportObjects_out ret;
@@ -704,7 +704,7 @@ public:
     void exportSelectedObjects(exportSelectedObjects_in *in, exportSelectedObjects_out *out)
     {
         exportObjects_in args;
-        args._scriptID = in->_scriptID;
+        args._ = in->_;
         getObjectSelection(args.objectHandles);
         if(args.objectHandles.empty()) return;
         exportObjects_out ret;
@@ -714,7 +714,7 @@ public:
     void exportObjects(exportObjects_in *in, exportObjects_out *out)
     {
         exportObject_in args;
-        args._scriptID = in->_scriptID;
+        args._ = in->_;
         exportObject_out ret;
         for(simInt obj : in->objectHandles)
         {
