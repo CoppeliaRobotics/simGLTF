@@ -17,13 +17,13 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "external/tinygltf/tiny_gltf.h"
 
-using simUID = simInt;
+using simUID = int;
 
 struct simPose3D
 {
-    simInt handle;
-    simFloat position[3];
-    simFloat orientation[4];
+    int handle;
+    float position[3];
+    float orientation[4];
     bool visible;
 };
 
@@ -73,7 +73,7 @@ public:
 
     bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
     {
-        simFloat t[3], r[4];
+        float t[3], r[4];
         if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
             return false;
         if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
@@ -84,7 +84,7 @@ public:
     }
 
     template<typename T>
-    void minMax(const std::vector<T> &v, simInt offset, simInt step, double &min, double &max)
+    void minMax(const std::vector<T> &v, int offset, int step, double &min, double &max)
     {
         for(int i = offset; i < v.size(); i += step)
         {
@@ -94,7 +94,7 @@ public:
     }
 
     template<typename T>
-    void minMaxVec(const std::vector<T> &v, simInt step, std::vector<double> &min, std::vector<double> &max)
+    void minMaxVec(const std::vector<T> &v, int step, std::vector<double> &min, std::vector<double> &max)
     {
         min.resize(step);
         max.resize(step);
@@ -108,25 +108,25 @@ public:
         simReleaseBuffer(reinterpret_cast<const char *>(b));
     }
 
-    void getObjectSelection(std::vector<simInt> &v)
+    void getObjectSelection(std::vector<int> &v)
     {
         int selectionSize = simGetObjectSelectionSize();
         v.resize(selectionSize);
         simGetObjectSelection(v.data());
     }
 
-    simInt getVisibleLayers()
+    int getVisibleLayers()
     {
-        simInt v = 0;
+        int v = 0;
         if(simGetInt32Parameter(sim_intparam_visible_layers, &v) == -1)
             return 0;
         else
             return v;
     }
 
-    std::string getObjectName(simInt handle)
+    std::string getObjectName(int handle)
     {
-        simChar *name = simGetObjectName(handle);
+        char *name = simGetObjectName(handle);
         std::string ret;
         if(name)
         {
@@ -136,25 +136,25 @@ public:
         return ret;
     }
 
-    simFloat getObjectFloatParam(simInt handle, simInt param)
+    float getObjectFloatParam(int handle, int param)
     {
-        simFloat value;
-        simInt result = simGetObjectFloatParameter(handle, param, &value);
+        float value;
+        int result = simGetObjectFloatParameter(handle, param, &value);
         if(result == 0) throw sim::exception("simGetObjectFloatParameter: param %d not found in object %d", param, handle);
         if(result == 1) return value;
         throw std::runtime_error("simGetObjectFloatParameter: error");
     }
 
-    simInt getObjectIntParam(simInt handle, simInt param)
+    int getObjectIntParam(int handle, int param)
     {
-        simInt value;
-        simInt result = simGetObjectInt32Parameter(handle, param, &value);
+        int value;
+        int result = simGetObjectInt32Parameter(handle, param, &value);
         if(result == 0) throw sim::exception("simGetObjectInt32Parameter: param %d not found in object %d", param, handle);
         if(result == 1) return value;
         throw std::runtime_error("simGetObjectInt32Parameter: error");
     }
 
-    simInt getObjectLayers(simInt handle)
+    int getObjectLayers(int handle)
     {
         try
         {
@@ -166,7 +166,7 @@ public:
         }
     }
 
-    bool is(simInt handle, simInt param)
+    bool is(int handle, int param)
     {
         try
         {
@@ -178,46 +178,46 @@ public:
         }
     }
 
-    bool isCompound(simInt handle)
+    bool isCompound(int handle)
     {
         return is(handle, sim_shapeintparam_compound);
     }
 
-    bool isWireframe(simInt handle)
+    bool isWireframe(int handle)
     {
         return is(handle, sim_shapeintparam_wireframe);
     }
 
-    bool isVisible(simInt handle)
+    bool isVisible(int handle)
     {
-        simInt visibleLayers = getVisibleLayers();
-        simInt layers = getObjectLayers(handle);
+        int visibleLayers = getVisibleLayers();
+        int layers = getObjectLayers(handle);
         return visibleLayers & layers;
     }
 
-    bool isShape(simInt handle)
+    bool isShape(int handle)
     {
-        simInt objType = simGetObjectType(handle);
+        int objType = simGetObjectType(handle);
         return objType == sim_object_shape_type;
     }
 
-    bool isCamera(simInt handle)
+    bool isCamera(int handle)
     {
-        simInt objType = simGetObjectType(handle);
+        int objType = simGetObjectType(handle);
         return objType == sim_object_camera_type;
     }
 
-    bool isLight(simInt handle)
+    bool isLight(int handle)
     {
-        simInt objType = simGetObjectType(handle);
+        int objType = simGetObjectType(handle);
         return objType == sim_object_light_type;
     }
 
-    std::vector<simInt> ungroupShape(simInt handle)
+    std::vector<int> ungroupShape(int handle)
     {
-        std::vector<simInt> ret;
-        simInt count;
-        simInt *shapes = simUngroupShape(handle, &count);
+        std::vector<int> ret;
+        int count;
+        int *shapes = simUngroupShape(handle, &count);
         if(shapes)
         {
             ret.resize(count);
@@ -228,16 +228,16 @@ public:
         return ret;
     }
 
-    std::vector<simInt> ungroupShapeCopy(simInt handle)
+    std::vector<int> ungroupShapeCopy(int handle)
     {
-        simInt handles[1] = {handle};
+        int handles[1] = {handle};
         simCopyPasteObjects(handles, 1, 0);
         return ungroupShape(handles[0]);
     }
 
-    std::vector<simFloat> getShapeColor(simInt handle, simInt colorComponent)
+    std::vector<float> getShapeColor(int handle, int colorComponent)
     {
-        std::vector<simFloat> ret;
+        std::vector<float> ret;
         ret.resize(3);
         simGetShapeColor(handle, 0, colorComponent, ret.data());
         return ret;
@@ -432,7 +432,7 @@ public:
         return buf;
     }
 
-    int addImage(simInt id, const void *imgdata, int res[2], const std::string &objname)
+    int addImage(int id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
         {
@@ -459,7 +459,7 @@ public:
         return i;
     }
 
-    void expandVertices(simFloat *vertices, simInt verticesSize, simInt *indices, simInt indicesSize, simFloat *normals, simFloat *texCoords, std::vector<simFloat> &vertices2, std::vector<simInt> &indices2, std::vector<simFloat> &normals2, std::vector<simFloat> &texCoords2)
+    void expandVertices(float *vertices, int verticesSize, int *indices, int indicesSize, float *normals, float *texCoords, std::vector<float> &vertices2, std::vector<int> &indices2, std::vector<float> &normals2, std::vector<float> &texCoords2)
     {
         vertices2.resize(3 * indicesSize);
         indices2.resize(indicesSize);
@@ -489,31 +489,31 @@ public:
         sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
         struct SShapeVizInfo info;
-        simInt result = simGetShapeViz(handle, 0, &info);
+        int result = simGetShapeViz(handle, 0, &info);
         if(result < 1) throw sim::exception("simGetShapeViz returned %d", result);
         bool hasTexture = result == 2;
         sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
-        std::vector<simFloat> vertices2;
-        std::vector<simInt> indices2;
-        std::vector<simFloat> normals2;
-        std::vector<simFloat> texCoords2;
+        std::vector<float> vertices2;
+        std::vector<int> indices2;
+        std::vector<float> normals2;
+        std::vector<float> texCoords2;
         expandVertices(info.vertices, info.verticesSize, info.indices, info.indicesSize, info.normals, hasTexture ? info.textureCoords : 0L, vertices2, indices2, normals2, texCoords2);
         releaseBuffer(info.vertices);
         releaseBuffer(info.indices);
         releaseBuffer(info.normals);
 
-        std::vector<simFloat> diffuse(&info.colors[0], &info.colors[0] + 3);
-        std::vector<simFloat> specular(&info.colors[3], &info.colors[3] + 3);
-        std::vector<simFloat> emission(&info.colors[6], &info.colors[6] + 3);
+        std::vector<float> diffuse(&info.colors[0], &info.colors[0] + 3);
+        std::vector<float> specular(&info.colors[3], &info.colors[3] + 3);
+        std::vector<float> emission(&info.colors[6], &info.colors[6] + 3);
 
-        int bv = addBuffer(vertices2.data(), sizeof(simFloat) * vertices2.size(), name + " vertex");
-        int bi = addBuffer(indices2.data(), sizeof(simInt) * indices2.size(), name + " index");
-        int bn = addBuffer(normals2.data(), sizeof(simFloat) * normals2.size(), name + " normal");
+        int bv = addBuffer(vertices2.data(), sizeof(float) * vertices2.size(), name + " vertex");
+        int bi = addBuffer(indices2.data(), sizeof(int) * indices2.size(), name + " index");
+        int bn = addBuffer(normals2.data(), sizeof(float) * normals2.size(), name + " normal");
 
-        int vv = addBufferView(bv, sizeof(simFloat) * vertices2.size(), 0, name + " vertex");
-        int vi = addBufferView(bi, sizeof(simInt) * indices2.size(), 0, name + " index");
-        int vn = addBufferView(bn, sizeof(simFloat) * normals2.size(), 0, name + " normal");
+        int vv = addBufferView(bv, sizeof(float) * vertices2.size(), 0, name + " vertex");
+        int vi = addBufferView(bi, sizeof(int) * indices2.size(), 0, name + " index");
+        int vn = addBufferView(bn, sizeof(float) * normals2.size(), 0, name + " normal");
 
         std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
         minMaxVec(vertices2, 3, vmin, vmax);
@@ -543,8 +543,8 @@ public:
 
         if(hasTexture)
         {
-            int bt = addBuffer(texCoords2.data(), sizeof(simFloat) * texCoords2.size(), name + " texture coord");
-            int vt = addBufferView(bt, sizeof(simFloat) * texCoords2.size(), 0, name + " texture coord");
+            int bt = addBuffer(texCoords2.data(), sizeof(float) * texCoords2.size(), name + " texture coord");
+            int vt = addBufferView(bt, sizeof(float) * texCoords2.size(), 0, name + " texture coord");
             minMaxVec(texCoords2, 2, tmin, tmax);
             int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
             model.meshes[mesh].primitives[0].attributes["TEXCOORD_0"] = at;
@@ -573,7 +573,7 @@ public:
 
     void exportShape(exportShape_in *in, exportShape_out *out)
     {
-        simInt obj = in->shapeHandle;
+        int obj = in->shapeHandle;
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
         model.nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
@@ -582,7 +582,7 @@ public:
 
         if(isCompound(obj))
         {
-            for(simInt subObj : ungroupShapeCopy(obj))
+            for(int subObj : ungroupShapeCopy(obj))
             {
                 if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
                 {
@@ -604,8 +604,8 @@ public:
 
     void exportObject(exportObject_in *in, exportObject_out *out)
     {
-        simInt visibleLayers = getVisibleLayers();
-        simInt obj = in->objectHandle;
+        int visibleLayers = getVisibleLayers();
+        int obj = in->objectHandle;
 
         if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
         {
@@ -665,7 +665,7 @@ public:
             int lightIndex = model.lights.size();
             model.lights.push_back({});
             model.lights[lightIndex].name = getObjectName(obj);
-            simFloat diffuse[3], specular[3];
+            float diffuse[3], specular[3];
             if(simGetLightParameters(obj, nullptr, &diffuse[0], &specular[0]) != -1)
                 model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
             model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
@@ -675,15 +675,15 @@ public:
         }
     }
 
-    void getAllObjects(std::vector<simInt> &v)
+    void getAllObjects(std::vector<int> &v)
     {
-        simInt allObjectsCount;
-        simInt *allObjectsBuf = simGetObjectsInTree(sim_handle_scene, sim_handle_all, 0, &allObjectsCount);
+        int allObjectsCount;
+        int *allObjectsBuf = simGetObjectsInTree(sim_handle_scene, sim_handle_all, 0, &allObjectsCount);
         if(allObjectsBuf)
         {
             for(int i = 0; i < allObjectsCount; i++)
             {
-                simInt obj = allObjectsBuf[i];
+                int obj = allObjectsBuf[i];
                 if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
                     v.push_back(obj);
             }
@@ -716,7 +716,7 @@ public:
         exportObject_in args;
         args._ = in->_;
         exportObject_out ret;
-        for(simInt obj : in->objectHandles)
+        for(int obj : in->objectHandles)
         {
             args.objectHandle = obj;
             exportObject(&args, &ret);
@@ -729,8 +729,8 @@ public:
 
         // create time buffer:
         int n = times.size();
-        int bt = addBuffer(times.data(), sizeof(simFloat) * n, "time");
-        int vt = addBufferView(bt, sizeof(simFloat) * n, 0, "time");
+        int bt = addBuffer(times.data(), sizeof(float) * n, "time");
+        int vt = addBufferView(bt, sizeof(float) * n, 0, "time");
         std::vector<double> tmin, tmax;
         minMaxVec(times, 1, tmin, tmax);
         int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
@@ -753,7 +753,7 @@ public:
 
             // create translation and rotation buffers:
             std::string name = model.nodes[track.nodeIndex].name;
-            std::vector<simFloat> p(n * 3), r(n * 4), s(n * 3);
+            std::vector<float> p(n * 3), r(n * 4), s(n * 3);
             for(int i = 0; i < n; i++)
             {
                 bool exists = track.track.find(i) != track.track.end();
@@ -765,20 +765,20 @@ public:
                     s[3 * i + j] = exists && track.track[i].visible ? 1.0 : 0.0;
             }
 
-            int bp = addBuffer(p.data(), sizeof(simFloat) * n * 3, name + " position");
-            int vp = addBufferView(bp, sizeof(simFloat) * n * 3, 0, name + " position");
+            int bp = addBuffer(p.data(), sizeof(float) * n * 3, name + " position");
+            int vp = addBufferView(bp, sizeof(float) * n * 3, 0, name + " position");
             std::vector<double> pmin, pmax;
             minMaxVec(p, 3, pmin, pmax);
             int ap = addAccessor(vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
-            int br = addBuffer(r.data(), sizeof(simFloat) * n * 4, name + " rotation");
-            int vr = addBufferView(br, sizeof(simFloat) * n * 4, 0, name + " rotation");
+            int br = addBuffer(r.data(), sizeof(float) * n * 4, name + " rotation");
+            int vr = addBufferView(br, sizeof(float) * n * 4, 0, name + " rotation");
             std::vector<double> rmin, rmax;
             minMaxVec(r, 4, rmin, rmax);
             int ar = addAccessor(vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
-            int bs = addBuffer(s.data(), sizeof(simFloat) * n * 3, name + " scale");
-            int vs = addBufferView(bs, sizeof(simFloat) * n * 3, 0, name + " scale");
+            int bs = addBuffer(s.data(), sizeof(float) * n * 3, name + " scale");
+            int vs = addBufferView(bs, sizeof(float) * n * 3, 0, name + " scale");
             std::vector<double> smin, smax;
             minMaxVec(s, 3, smin, smax);
             int as = addAccessor(vs, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
@@ -825,7 +825,7 @@ public:
         if(!recordAnimationFlag || simGetSimulationState() != sim_simulation_advancing_running)
             return;
 
-        simFloat time = simGetSimulationTime();
+        float time = simGetSimulationTime();
         size_t timeIndex = times.size();
         times.push_back(time);
 
@@ -857,7 +857,7 @@ private:
 
     // for animation data:
     std::map<simUID, simAnimTrack> frames;
-    std::vector<simFloat> times;
+    std::vector<float> times;
     bool recordAnimationFlag = false;
 
     int bufferPreviewSize = 0;
