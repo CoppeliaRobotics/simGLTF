@@ -22,8 +22,8 @@ using simUID = int;
 struct simPose3D
 {
     int handle;
-    float position[3];
-    float orientation[4];
+    double position[3];
+    double orientation[4];
     bool visible;
 };
 
@@ -73,7 +73,7 @@ public:
 
     bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
     {
-        float t[3], r[4];
+        double t[3], r[4];
         if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
             return false;
         if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
@@ -105,7 +105,7 @@ public:
     template<typename T>
     void releaseBuffer(const T *b)
     {
-        simReleaseBuffer(reinterpret_cast<const char *>(b));
+        simReleaseBuffer(b);
     }
 
     void getObjectSelection(std::vector<int> &v)
@@ -136,9 +136,9 @@ public:
         return ret;
     }
 
-    float getObjectFloatParam(int handle, int param)
+    double getObjectFloatParam(int handle, int param)
     {
-        float value;
+        double value;
         int result = simGetObjectFloatParameter(handle, param, &value);
         if(result == 0) throw sim::exception("simGetObjectFloatParameter: param %d not found in object %d", param, handle);
         if(result == 1) return value;
@@ -459,7 +459,7 @@ public:
         return i;
     }
 
-    void expandVertices(float *vertices, int verticesSize, int *indices, int indicesSize, float *normals, float *texCoords, std::vector<float> &vertices2, std::vector<int> &indices2, std::vector<float> &normals2, std::vector<float> &texCoords2)
+    void expandVertices(double *vertices, int verticesSize, int *indices, int indicesSize, double *normals, double *texCoords, std::vector<double> &vertices2, std::vector<int> &indices2, std::vector<double> &normals2, std::vector<double> &texCoords2)
     {
         vertices2.resize(3 * indicesSize);
         indices2.resize(indicesSize);
@@ -494,10 +494,10 @@ public:
         bool hasTexture = result == 2;
         sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
-        std::vector<float> vertices2;
+        std::vector<double> vertices2;
         std::vector<int> indices2;
-        std::vector<float> normals2;
-        std::vector<float> texCoords2;
+        std::vector<double> normals2;
+        std::vector<double> texCoords2;
         expandVertices(info.vertices, info.verticesSize, info.indices, info.indicesSize, info.normals, hasTexture ? info.textureCoords : 0L, vertices2, indices2, normals2, texCoords2);
         releaseBuffer(info.vertices);
         releaseBuffer(info.indices);
@@ -507,21 +507,21 @@ public:
         std::vector<float> specular(&info.colors[3], &info.colors[3] + 3);
         std::vector<float> emission(&info.colors[6], &info.colors[6] + 3);
 
-        int bv = addBuffer(vertices2.data(), sizeof(float) * vertices2.size(), name + " vertex");
+        int bv = addBuffer(vertices2.data(), sizeof(double) * vertices2.size(), name + " vertex");
         int bi = addBuffer(indices2.data(), sizeof(int) * indices2.size(), name + " index");
-        int bn = addBuffer(normals2.data(), sizeof(float) * normals2.size(), name + " normal");
+        int bn = addBuffer(normals2.data(), sizeof(double) * normals2.size(), name + " normal");
 
-        int vv = addBufferView(bv, sizeof(float) * vertices2.size(), 0, name + " vertex");
+        int vv = addBufferView(bv, sizeof(double) * vertices2.size(), 0, name + " vertex");
         int vi = addBufferView(bi, sizeof(int) * indices2.size(), 0, name + " index");
-        int vn = addBufferView(bn, sizeof(float) * normals2.size(), 0, name + " normal");
+        int vn = addBufferView(bn, sizeof(double) * normals2.size(), 0, name + " normal");
 
         std::vector<double> vmin, vmax, imin, imax, nmin, nmax, tmin, tmax;
         minMaxVec(vertices2, 3, vmin, vmax);
-        int av = addAccessor(vv, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
+        int av = addAccessor(vv, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC3, vertices2.size() / 3, vmin, vmax, name + " vertex");
         minMaxVec(indices2, 1, imin, imax);
         int ai = addAccessor(vi, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR, indices2.size(), imin, imax, name + " index");
         minMaxVec(normals2, 3, nmin, nmax);
-        int an = addAccessor(vn, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
+        int an = addAccessor(vn, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC3, normals2.size() / 3, nmin, nmax, name + " normal");
 
         int mesh = model.meshes.size();
         model.meshes.push_back({});
@@ -543,10 +543,10 @@ public:
 
         if(hasTexture)
         {
-            int bt = addBuffer(texCoords2.data(), sizeof(float) * texCoords2.size(), name + " texture coord");
-            int vt = addBufferView(bt, sizeof(float) * texCoords2.size(), 0, name + " texture coord");
+            int bt = addBuffer(texCoords2.data(), sizeof(double) * texCoords2.size(), name + " texture coord");
+            int vt = addBufferView(bt, sizeof(double) * texCoords2.size(), 0, name + " texture coord");
             minMaxVec(texCoords2, 2, tmin, tmax);
-            int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
+            int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC2, texCoords2.size() / 2, tmin, tmax, name + " texture coord");
             model.meshes[mesh].primitives[0].attributes["TEXCOORD_0"] = at;
             bool repU = info.textureOptions & 1;
             bool repV = info.textureOptions & 2;
@@ -665,7 +665,7 @@ public:
             int lightIndex = model.lights.size();
             model.lights.push_back({});
             model.lights[lightIndex].name = getObjectName(obj);
-            float diffuse[3], specular[3];
+            double diffuse[3], specular[3];
             if(simGetLightParameters(obj, nullptr, &diffuse[0], &specular[0]) != -1)
                 model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
             model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
@@ -729,11 +729,11 @@ public:
 
         // create time buffer:
         int n = times.size();
-        int bt = addBuffer(times.data(), sizeof(float) * n, "time");
-        int vt = addBufferView(bt, sizeof(float) * n, 0, "time");
+        int bt = addBuffer(times.data(), sizeof(double) * n, "time");
+        int vt = addBufferView(bt, sizeof(double) * n, 0, "time");
         std::vector<double> tmin, tmax;
         minMaxVec(times, 1, tmin, tmax);
-        int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
+        int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
 
         for(auto &frame : frames)
         {
@@ -753,7 +753,7 @@ public:
 
             // create translation and rotation buffers:
             std::string name = model.nodes[track.nodeIndex].name;
-            std::vector<float> p(n * 3), r(n * 4), s(n * 3);
+            std::vector<double> p(n * 3), r(n * 4), s(n * 3);
             for(int i = 0; i < n; i++)
             {
                 bool exists = track.track.find(i) != track.track.end();
@@ -765,23 +765,23 @@ public:
                     s[3 * i + j] = exists && track.track[i].visible ? 1.0 : 0.0;
             }
 
-            int bp = addBuffer(p.data(), sizeof(float) * n * 3, name + " position");
-            int vp = addBufferView(bp, sizeof(float) * n * 3, 0, name + " position");
+            int bp = addBuffer(p.data(), sizeof(double) * n * 3, name + " position");
+            int vp = addBufferView(bp, sizeof(double) * n * 3, 0, name + " position");
             std::vector<double> pmin, pmax;
             minMaxVec(p, 3, pmin, pmax);
-            int ap = addAccessor(vp, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
+            int ap = addAccessor(vp, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
 
-            int br = addBuffer(r.data(), sizeof(float) * n * 4, name + " rotation");
-            int vr = addBufferView(br, sizeof(float) * n * 4, 0, name + " rotation");
+            int br = addBuffer(r.data(), sizeof(double) * n * 4, name + " rotation");
+            int vr = addBufferView(br, sizeof(double) * n * 4, 0, name + " rotation");
             std::vector<double> rmin, rmax;
             minMaxVec(r, 4, rmin, rmax);
-            int ar = addAccessor(vr, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
+            int ar = addAccessor(vr, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
 
-            int bs = addBuffer(s.data(), sizeof(float) * n * 3, name + " scale");
-            int vs = addBufferView(bs, sizeof(float) * n * 3, 0, name + " scale");
+            int bs = addBuffer(s.data(), sizeof(double) * n * 3, name + " scale");
+            int vs = addBufferView(bs, sizeof(double) * n * 3, 0, name + " scale");
             std::vector<double> smin, smax;
             minMaxVec(s, 3, smin, smax);
-            int as = addAccessor(vs, 0, TINYGLTF_COMPONENT_TYPE_FLOAT, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
+            int as = addAccessor(vs, 0, TINYGLTF_COMPONENT_TYPE_DOUBLE, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
 
             // create samplers & channels:
             model.animations[0].samplers[ip].interpolation = "STEP";
@@ -825,7 +825,7 @@ public:
         if(!recordAnimationFlag || simGetSimulationState() != sim_simulation_advancing_running)
             return;
 
-        float time = simGetSimulationTime();
+        double time = simGetSimulationTime();
         size_t timeIndex = times.size();
         times.push_back(time);
 
@@ -857,7 +857,7 @@ private:
 
     // for animation data:
     std::map<simUID, simAnimTrack> frames;
-    std::vector<float> times;
+    std::vector<double> times;
     bool recordAnimationFlag = false;
 
     int bufferPreviewSize = 0;
