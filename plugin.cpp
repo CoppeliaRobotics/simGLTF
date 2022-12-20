@@ -110,15 +110,23 @@ public:
 
     void getObjectSelection(std::vector<int> &v)
     {
-        int selectionSize = simGetObjectSelectionSize();
-        v.resize(selectionSize);
-        simGetObjectSelection(v.data());
+        int cnt=0;
+        int* handles=simGetObjectSel(&cnt);
+        if (handles!=NULL)
+        {
+            v.resize(cnt);
+            for (int i=0;i<cnt;i++)
+                v[i]=handles[i];
+            simReleaseBuffer(handles);
+        }
+        else
+            v.resize(0);
     }
 
     int getVisibleLayers()
     {
         int v = 0;
-        if(simGetInt32Parameter(sim_intparam_visible_layers, &v) == -1)
+        if(simGetInt32Param(sim_intparam_visible_layers, &v) == -1)
             return 0;
         else
             return v;
@@ -126,7 +134,7 @@ public:
 
     std::string getObjectName(int handle)
     {
-        char *name = simGetObjectName(handle);
+        char *name = simGetObjectAlias(handle,4);
         std::string ret;
         if(name)
         {
@@ -139,19 +147,19 @@ public:
     double getObjectFloatParam(int handle, int param)
     {
         double value;
-        int result = simGetObjectFloatParameter(handle, param, &value);
-        if(result == 0) throw sim::exception("simGetObjectFloatParameter: param %d not found in object %d", param, handle);
+        int result = simGetObjectFloatParam(handle, param, &value);
+        if(result == 0) throw sim::exception("simGetObjectFloatParam: param %d not found in object %d", param, handle);
         if(result == 1) return value;
-        throw std::runtime_error("simGetObjectFloatParameter: error");
+        throw std::runtime_error("simGetObjectFloatParam: error");
     }
 
     int getObjectIntParam(int handle, int param)
     {
         int value;
-        int result = simGetObjectInt32Parameter(handle, param, &value);
-        if(result == 0) throw sim::exception("simGetObjectInt32Parameter: param %d not found in object %d", param, handle);
+        int result = simGetObjectInt32Param(handle, param, &value);
+        if(result == 0) throw sim::exception("simGetObjectInt32Param: param %d not found in object %d", param, handle);
         if(result == 1) return value;
-        throw std::runtime_error("simGetObjectInt32Parameter: error");
+        throw std::runtime_error("simGetObjectInt32Param: error");
     }
 
     int getObjectLayers(int handle)
@@ -594,7 +602,7 @@ public:
                     exportShape_out ret;
                     exportShape(&args, &ret);
                 }
-                simRemoveObject(subObj);
+                simRemoveObjects(&subObj,1);
             }
             return;
         }
@@ -833,8 +841,8 @@ public:
         getAllObjects(allObjects);
         for(int handle : allObjects)
         {
-            simUID uid;
-            if(simGetObjectUniqueIdentifier(handle, &uid) == -1) continue;
+            long long int uid=simGetObjectUid(handle);
+            if (uid == -1) continue;
             auto it = frames.find(uid);
             if(it == frames.end())
             {
