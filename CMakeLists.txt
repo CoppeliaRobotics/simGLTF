@@ -15,7 +15,7 @@ if(NOT LIBPLUGIN_DIR)
 endif()
 list(APPEND CMAKE_MODULE_PATH
     ${LIBPLUGIN_DIR}/cmake)
-find_package(CoppeliaSim 4.1.0.0 REQUIRED)
+find_package(CoppeliaSim 4.5.0.0 REQUIRED)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
