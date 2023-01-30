@@ -1,13 +1,18 @@
 function sysCall_info()
-    return {autoStart=false,menu='Exporters\nGLTF animation exporter'}
+    return {autoStart=false,menu='Exporters\nGLTF animation exporter...'}
 end
 
 function sysCall_init()
-    sim.msgBox(sim.msgbox_type_info,sim.msgbox_buttons_ok,'GLTF Animation Export','GLTF animation export is active. Content of current simulation will be recorded, and will be saved when the simulation will stop.')
-    simGLTF.recordAnimation(true)
+    if simUI.msgBox(simUI.msgbox_type.info,simUI.msgbox_buttons.okcancel,"GLTF Animation Export",'This add-on allows to record GLTF animation for a given time period. Recording will start after pressing Ok, and will end by stopping simulation or by selecting the add-on menu item again. After stopping, the location where to save the file can be selected.\n\nPress Ok to start recording, or Cancel to abort.')==simUI.msgbox_result.ok then
+        sim.addLog(sim.verbosity_scriptinfos,'Recording GLTF animation... (stop the add-on to save to file)')
+        simGLTF.recordAnimation(true)
+    else
+        return {cmd='cleanup'}
+    end
 end
 
 function sysCall_addOnScriptSuspend()
+    sysCall_afterSimulation()
     simGLTF.recordAnimation(false)
     simGLTF.clear()
     return {cmd='cleanup'}
@@ -24,6 +29,7 @@ function sysCall_afterSimulation()
             simGLTF.saveASCII(fileName)
             simGLTF.recordAnimation(false)
             simGLTF.clear()
+            sim.addLog(sim.verbosity_scriptinfos,'Exported GLTF animation to '..fileName)
         end
         return {cmd='cleanup'}
     end
