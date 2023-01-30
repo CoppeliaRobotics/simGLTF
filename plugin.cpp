@@ -22,8 +22,8 @@ using simUID = int;
 struct simPose3D
 {
     int handle;
-    double position[3];
-    double orientation[4];
+    std::array<double, 3> position;
+    std::array<double, 4> orientation;
     bool visible;
 };
 
@@ -73,11 +73,8 @@ public:
 
     bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
     {
-        double t[3], r[4];
-        if(simGetObjectPosition(handle, relTo, &t[0]) == -1)
-            return false;
-        if(simGetObjectQuaternion(handle, relTo, &r[0]) == -1)
-            return false;
+        auto t = sim::getObjectPosition(handle, relTo);
+        auto r = sim::getObjectQuaternion(handle, relTo);
         node.translation = {t[0], t[1], t[2]};
         node.rotation = {r[0], r[1], r[2], r[3]};
         return true;
@@ -105,68 +102,24 @@ public:
     template<typename T>
     void releaseBuffer(const T *b)
     {
-        simReleaseBuffer(b);
-    }
-
-    void getObjectSelection(std::vector<int> &v)
-    {
-        int cnt=0;
-        int* handles=simGetObjectSel(&cnt);
-        if (handles!=NULL)
-        {
-            v.resize(cnt);
-            for (int i=0;i<cnt;i++)
-                v[i]=handles[i];
-            simReleaseBuffer(handles);
-        }
-        else
-            v.resize(0);
+        sim::releaseBuffer(b);
     }
 
     int getVisibleLayers()
     {
-        int v = 0;
-        if(simGetInt32Param(sim_intparam_visible_layers, &v) == -1)
-            return 0;
-        else
-            return v;
+        return sim::getInt32Param(sim_intparam_visible_layers);
     }
 
     std::string getObjectName(int handle)
     {
-        char *name = simGetObjectAlias(handle,4);
-        std::string ret;
-        if(name)
-        {
-            ret = name;
-            releaseBuffer(name);
-        }
-        return ret;
-    }
-
-    double getObjectFloatParam(int handle, int param)
-    {
-        double value;
-        int result = simGetObjectFloatParam(handle, param, &value);
-        if(result == 0) throw sim::exception("simGetObjectFloatParam: param %d not found in object %d", param, handle);
-        if(result == 1) return value;
-        throw std::runtime_error("simGetObjectFloatParam: error");
-    }
-
-    int getObjectIntParam(int handle, int param)
-    {
-        int value;
-        int result = simGetObjectInt32Param(handle, param, &value);
-        if(result == 0) throw sim::exception("simGetObjectInt32Param: param %d not found in object %d", param, handle);
-        if(result == 1) return value;
-        throw std::runtime_error("simGetObjectInt32Param: error");
+        return sim::getObjectAlias(handle, 4);
     }
 
     int getObjectLayers(int handle)
     {
         try
         {
-            return getObjectIntParam(handle, sim_objintparam_visibility_layer);
+            return sim::getObjectInt32Param(handle, sim_objintparam_visibility_layer);
         }
         catch(...)
         {
@@ -178,7 +131,7 @@ public:
     {
         try
         {
-            return getObjectIntParam(handle, param) != 0;
+            return sim::getObjectInt32Param(handle, param) != 0;
         }
         catch(...)
         {
@@ -205,57 +158,33 @@ public:
 
     bool isShape(int handle)
     {
-        int objType = simGetObjectType(handle);
+        int objType = sim::getObjectType(handle);
         return objType == sim_object_shape_type;
     }
 
     bool isCamera(int handle)
     {
-        int objType = simGetObjectType(handle);
+        int objType = sim::getObjectType(handle);
         return objType == sim_object_camera_type;
     }
 
     bool isLight(int handle)
     {
-        int objType = simGetObjectType(handle);
+        int objType = sim::getObjectType(handle);
         return objType == sim_object_light_type;
-    }
-
-    std::vector<int> ungroupShape(int handle)
-    {
-        std::vector<int> ret;
-        int count;
-        int *shapes = simUngroupShape(handle, &count);
-        if(shapes)
-        {
-            ret.resize(count);
-            for(int i = 0; i < count; i++)
-                ret[i] = shapes[i];
-            releaseBuffer(shapes);
-        }
-        return ret;
     }
 
     std::vector<int> ungroupShapeCopy(int handle)
     {
-        int handles[1] = {handle};
-        simCopyPasteObjects(handles, 1, 0);
-        return ungroupShape(handles[0]);
-    }
-
-    std::vector<float> getShapeColor(int handle, int colorComponent)
-    {
-        std::vector<float> ret;
-        ret.resize(3);
-        simGetShapeColor(handle, 0, colorComponent, ret.data());
-        return ret;
+        auto handles = sim::copyPasteObjects({handle}, 0);
+        return sim::ungroupShape(handles[0]);
     }
 
     void simPose3D_get(simPose3D *p, int handle, int relTo)
     {
         p->handle = handle;
-        simGetObjectPosition(handle, relTo, &p->position[0]);
-        simGetObjectQuaternion(handle, relTo, &p->orientation[0]);
+        p->position = sim::getObjectPosition(handle, relTo);
+        p->orientation = sim::getObjectQuaternion(handle, relTo);
         p->visible = !isShape(handle) || (isVisible(handle) && !isWireframe(handle));
     }
 
@@ -497,8 +426,7 @@ public:
         sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
         struct SShapeVizInfo info;
-        int result = simGetShapeViz(handle, 0, &info);
-        if(result < 1) throw sim::exception("simGetShapeViz returned %d", result);
+        int result = sim::getShapeViz(handle, 0, &info);
         bool hasTexture = result == 2;
         sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
@@ -602,7 +530,7 @@ public:
                     exportShape_out ret;
                     exportShape(&args, &ret);
                 }
-                simRemoveObjects(&subObj,1);
+                sim::removeObjects({subObj});
             }
             return;
         }
@@ -630,26 +558,26 @@ public:
             model.cameras.push_back({});
             model.cameras[cameraIndex].name = getObjectName(obj);
 #if 0
-            if(getObjectIntParam(obj, sim_cameraintparam_perspective_operation))
+            if(sim::getObjectInt32Param(obj, sim_cameraintparam_perspective_operation))
             {
                 model.cameras[cameraIndex].type = "perspective";
                 model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-                model.cameras[cameraIndex].perspective.yfov = getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
-                model.cameras[cameraIndex].perspective.znear = getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
-                model.cameras[cameraIndex].perspective.zfar = getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+                model.cameras[cameraIndex].perspective.yfov = sim::getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
+                model.cameras[cameraIndex].perspective.znear = sim::getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
+                model.cameras[cameraIndex].perspective.zfar = sim::getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
             }
             else
             {
                 model.cameras[cameraIndex].type = "orthographic";
-                model.cameras[cameraIndex].orthographic.xmag = getObjectIntParam(obj, sim_cameraintparam_resolution_x);
-                model.cameras[cameraIndex].orthographic.ymag = getObjectIntParam(obj, sim_cameraintparam_resolution_y);
-                model.cameras[cameraIndex].orthographic.znear = getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
-                model.cameras[cameraIndex].orthographic.zfar = getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+                model.cameras[cameraIndex].orthographic.xmag = sim::getObjectInt32Param(obj, sim_cameraintparam_resolution_x);
+                model.cameras[cameraIndex].orthographic.ymag = sim::getObjectInt32Param(obj, sim_cameraintparam_resolution_y);
+                model.cameras[cameraIndex].orthographic.znear = sim::getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
+                model.cameras[cameraIndex].orthographic.zfar = sim::getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
             }
 #else
             model.cameras[cameraIndex].type = "perspective";
             model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-            model.cameras[cameraIndex].perspective.yfov = getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
+            model.cameras[cameraIndex].perspective.yfov = sim::getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
             model.cameras[cameraIndex].perspective.znear = 0.001;
             model.cameras[cameraIndex].perspective.zfar = 1000.0;
 #endif
@@ -673,9 +601,9 @@ public:
             int lightIndex = model.lights.size();
             model.lights.push_back({});
             model.lights[lightIndex].name = getObjectName(obj);
-            double diffuse[3], specular[3];
-            if(simGetLightParameters(obj, nullptr, &diffuse[0], &specular[0]) != -1)
-                model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
+            std::array<double, 3> diffuse;
+            bool lightOn = sim::getLightParameters(obj, diffuse) & 1;
+            model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
             model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
             model.lights[lightIndex].type = "point"; // FIXME: where to get this value from sim?
             model.lights[lightIndex].range = 1.0; // FIXME: where to get this value from sim?
@@ -683,27 +611,16 @@ public:
         }
     }
 
-    void getAllObjects(std::vector<int> &v)
+    std::vector<int> getAllObjects()
     {
-        int allObjectsCount;
-        int *allObjectsBuf = simGetObjectsInTree(sim_handle_scene, sim_handle_all, 0, &allObjectsCount);
-        if(allObjectsBuf)
-        {
-            for(int i = 0; i < allObjectsCount; i++)
-            {
-                int obj = allObjectsBuf[i];
-                if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
-                    v.push_back(obj);
-            }
-            releaseBuffer(allObjectsBuf);
-        }
+        return sim::getObjectsInTree(sim_handle_scene, sim_handle_all);
     }
 
     void exportAllObjects(exportAllObjects_in *in, exportAllObjects_out *out)
     {
         exportObjects_in args;
         args._ = in->_;
-        getAllObjects(args.objectHandles);
+        args.objectHandles = getAllObjects();
         if(args.objectHandles.empty()) return;
         exportObjects_out ret;
         exportObjects(&args, &ret);
@@ -713,7 +630,7 @@ public:
     {
         exportObjects_in args;
         args._ = in->_;
-        getObjectSelection(args.objectHandles);
+        args.objectHandles = sim::getObjectSel();
         if(args.objectHandles.empty()) return;
         exportObjects_out ret;
         exportObjects(&args, &ret);
@@ -830,19 +747,17 @@ public:
 
     void readAnimationFrame()
     {
-        if(!recordAnimationFlag || simGetSimulationState() != sim_simulation_advancing_running)
+        if(!recordAnimationFlag || sim::getSimulationState() != sim_simulation_advancing_running)
             return;
 
-        double time = simGetSimulationTime();
+        double time = sim::getSimulationTime();
         size_t timeIndex = times.size();
         times.push_back(time);
 
-        std::vector<int> allObjects;
-        getAllObjects(allObjects);
+        std::vector<int> allObjects = getAllObjects();
         for(int handle : allObjects)
         {
-            long long int uid=simGetObjectUid(handle);
-            if (uid == -1) continue;
+            long long int uid = sim::getObjectUid(handle);
             auto it = frames.find(uid);
             if(it == frames.end())
             {
