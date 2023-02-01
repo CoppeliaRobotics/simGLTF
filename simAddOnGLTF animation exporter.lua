@@ -11,10 +11,13 @@ function sysCall_init()
     end
 end
 
-function sysCall_addOnScriptSuspend()
-    sysCall_afterSimulation()
+function sysCall_cleanup()
     simGLTF.recordAnimation(false)
     simGLTF.clear()
+end
+
+function sysCall_addOnScriptSuspend()
+    sysCall_afterSimulation()
     return {cmd='cleanup'}
 end
 
@@ -36,7 +39,5 @@ function sysCall_afterSimulation()
 end
 
 function sysCall_beforeInstanceSwitch()
-    simGLTF.recordAnimation(false)
-    simGLTF.clear()
     return {cmd='cleanup'}
 end
