@@ -613,7 +613,11 @@ public:
 
     std::vector<int> getAllObjects()
     {
-        return sim::getObjectsInTree(sim_handle_scene, sim_handle_all);
+        std::vector<int> v;
+        for(int obj : sim::getObjectsInTree(sim_handle_scene, sim_handle_all))
+            if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
+                 v.push_back(obj);
+        return v;
     }
 
     void exportAllObjects(exportAllObjects_in *in, exportAllObjects_out *out)
