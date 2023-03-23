@@ -405,7 +405,7 @@ public:
         return i;
     }
 
-    void expandVertices(double *vertices, int verticesSize, int *indices, int indicesSize, double *normals, double *texCoords, std::vector<gltfFloat> &vertices2, std::vector<int> &indices2, std::vector<gltfFloat> &normals2, std::vector<gltfFloat> &texCoords2)
+    void expandVertices(double *vertices, int verticesSize, int *indices, int indicesSize, double *normals, float *texCoords, std::vector<gltfFloat> &vertices2, std::vector<int> &indices2, std::vector<gltfFloat> &normals2, std::vector<gltfFloat> &texCoords2)
     {
         vertices2.resize(3 * indicesSize);
         indices2.resize(indicesSize);
