@@ -337,6 +337,14 @@ public:
         return i;
     }
 
+    static void stbi_write_func_vector(void* context, void* data, int size)
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            ((std::vector<unsigned char>*)context)->push_back(*(reinterpret_cast<unsigned char *>(data) + i));
+        }
+    }
+
     std::vector<unsigned char> raw2bmp(const unsigned char *data, int res[2], int bytesPerPixel)
     {
         int width = res[0];
@@ -378,6 +386,35 @@ public:
         return buf;
     }
 
+    std::vector<unsigned char> raw2jpg(const unsigned char *data, int res[2], int bytesPerPixel, int quality)
+    {
+        int width = res[0];
+        int height = res[1];
+        std::vector<unsigned char> buffer;
+        auto result = stbi_write_jpg_to_func(stbi_write_func_vector, &buffer, width, height, bytesPerPixel, data, quality);
+        return buffer;
+    }
+
+    std::vector<unsigned char> raw2png(const unsigned char *data, int res[2], int bytesPerPixel, int stride_bytes)
+    {
+        int width = res[0];
+        int height = res[1];
+        std::vector<unsigned char> buffer;
+        auto result = stbi_write_png_to_func(stbi_write_func_vector, &buffer, width, height, bytesPerPixel, data, stride_bytes);
+        return buffer;
+    }
+
+    std::vector<unsigned char> convertRawImage(const unsigned char *imgdata, int res[2])
+    {
+        if(exportTextureFormat == sim_gltf_texture_format_bmp)
+            return raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
+        else if(exportTextureFormat == sim_gltf_texture_format_png)
+            return raw2png(reinterpret_cast<const unsigned char *>(imgdata), res, 4, res[0]*4);
+        else if(exportTextureFormat == sim_gltf_texture_format_jpg)
+            return raw2jpg(reinterpret_cast<const unsigned char *>(imgdata), res, 4, 100);
+        throw std::runtime_error("unsupported texture format");
+    }
+
     int addImage(int id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
@@ -387,7 +424,7 @@ public:
         }
         sim::addLog(sim_verbosity_debug, "addImage: loading texture of object %s with id %d %s", objname, id, buf2str(imgdata, res[0] * res[1] * 4));
 
-        auto buf = raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
+        auto buf = convertRawImage(reinterpret_cast<const unsigned char *>(imgdata), res);
         std::string name = (boost::format("texture image %d [%s] (%dx%d, BMP %d bytes)") % id % objname % res[0] % res[1] % buf.size()).str();
 
         int b = addBuffer(buf.data(), buf.size(), name);
@@ -785,6 +822,17 @@ public:
         }
     }
 
+    void setExportTextureFormat(setExportTextureFormat_in *in, setExportTextureFormat_out *out)
+    {
+        exportTextureFormat = static_cast<TextureFormat>(in->textureFormat);
+    }
+
+    void getExportTextureFormat(getExportTextureFormat_in *in, getExportTextureFormat_out *out)
+    {
+        out->textureFormat = exportTextureFormat;
+        out->formatName = textureformat_string(exportTextureFormat);
+    }
+
 private:
     tinygltf::TinyGLTF gltf;
     tinygltf::Model model;
@@ -797,6 +845,8 @@ private:
     bool recordAnimationFlag = false;
 
     int bufferPreviewSize = 0;
+
+    TextureFormat exportTextureFormat = sim_gltf_texture_format_bmp;
 };
 
 SIM_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, Plugin)

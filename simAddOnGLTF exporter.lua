@@ -8,9 +8,11 @@ function sysCall_init()
     if sceneName==nil then sceneName='untitled' end
     local fileName=sim.fileDialog(sim.filedlg_type_save,'Export to glTF...',scenePath,sceneName..'.gltf','glTF file','gltf')
     if fileName==nil then return end
+    local fmt,fmtName=simGLTF.getExportTextureFormat()
+    sim.addLog(sim.verbosity_scriptinfos,'Texture export format is set to "'..fmtName..'". You can change that with simGLTF.setExportTextureFormat(format).')
     simGLTF.clear()
     simGLTF.exportAllObjects()
     simGLTF.saveASCII(fileName)
-    sim.addLog(sim.verbosity_infos+sim.verbosity_undecorated,'Exported glTF content to '..fileName)
+    sim.addLog(sim.verbosity_scriptinfos,'Exported glTF content to '..fileName)
     return {cmd='cleanup'}
 end

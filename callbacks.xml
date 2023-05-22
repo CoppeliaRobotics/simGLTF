@@ -159,4 +159,32 @@
         <return>
         </return>
     </command>
+    <command name="setExportTextureFormat">
+        <description>Set the image format (bmp, png, jpg) in which textures are exported.</description>
+        <params>
+            <param name="textureFormat" type="int">
+                <description>Format of exported texture images. See <enum-ref name="TextureFormat" />.</description>
+            </param>
+        </params>
+        <return>
+        </return>
+    </command>
+    <command name="getExportTextureFormat">
+        <description>Set the image format (bmp, png, jpg) in which textures are exported.</description>
+        <params>
+        </params>
+        <return>
+            <param name="textureFormat" type="int">
+                <description>Format of exported texture images. See <enum-ref name="TextureFormat" />.</description>
+            </param>
+            <param name="formatName" type="string">
+                <description>Format name.</description>
+            </param>
+        </return>
+    </command>
+    <enum name="TextureFormat" item-prefix="texture_format_" base="6761">
+        <item name="bmp"/>
+        <item name="png"/>
+        <item name="jpg"/>
+    </enum>
 </plugin>

@@ -5,6 +5,8 @@ end
 function sysCall_init()
     if simUI.msgBox(simUI.msgbox_type.info,simUI.msgbox_buttons.okcancel,"GLTF Animation Export",'This add-on allows to record GLTF animation for a given time period. Recording will start after pressing Ok, and will end by stopping simulation or by selecting the add-on menu item again. After stopping, the location where to save the file can be selected.\n\nPress Ok to start recording, or Cancel to abort.')==simUI.msgbox_result.ok then
         sim.addLog(sim.verbosity_scriptinfos,'Recording GLTF animation... (stop the add-on to save to file)')
+        local fmt,fmtName=simGLTF.getExportTextureFormat()
+        sim.addLog(sim.verbosity_scriptinfos,'Texture export format is set to "'..fmtName..'". You can change that with simGLTF.setExportTextureFormat(format).')
         simGLTF.recordAnimation(true)
     else
         return {cmd='cleanup'}
