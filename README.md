@@ -7,8 +7,8 @@ Plugin for support to the [glTF](https://github.com/KhronosGroup/glTF/blob/maste
 1. Install required packages for simStubsGen: see simStubsGen's [README](https://github.com/CoppeliaRobotics/include/blob/master/simStubsGen/README.md)
 2. Checkout, compile and install into CoppeliaSim:
 ```sh
-$ git clone https://github.com/CoppeliaRobotics/simExtGLTF.git
-$ cd simExtGLTF
+$ git clone https://github.com/CoppeliaRobotics/simGLTF.git
+$ cd simGLTF
 $ git checkout coppeliasim-v4.5.0-rev0
 $ mkdir -p build && cd build
 $ cmake -DCMAKE_BUILD_TYPE=Release ..

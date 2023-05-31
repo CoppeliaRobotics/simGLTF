@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.11)
-project(simExtGLTF)
+project(simGLTF)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_MACOSX_RPATH 1)
@@ -38,7 +38,7 @@ coppeliasim_generate_stubs(${CMAKE_CURRENT_BINARY_DIR}/generated XML_FILE ${CMAK
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-coppeliasim_add_plugin(simExtGLTF SOURCES plugin.cpp)
-target_link_libraries(simExtGLTF Boost::boost)
+coppeliasim_add_plugin(simGLTF SOURCES plugin.cpp)
+target_link_libraries(simGLTF Boost::boost)
 coppeliasim_add_addon("simAddOnGLTF animation exporter.lua")
 coppeliasim_add_addon("simAddOnGLTF exporter.lua")

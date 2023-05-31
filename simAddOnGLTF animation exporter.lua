@@ -1,3 +1,5 @@
+simGLTF=require'simGLTF'
+
 function sysCall_info()
     return {autoStart=false,menu='Exporters\nGLTF animation exporter...'}
 end
