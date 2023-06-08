@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <?xml-stylesheet type="text/xsl" href="callbacks.xsl"?>
 
-<plugin name="GLTF" author="federico.ferri.it@gmail.com">
+<plugin name="simGLTF" author="federico.ferri.it@gmail.com">
     <description>Plugin for glTF format support</description>
     <command name="clear">
         <description>Clear all data stored in memory (geometry, material, animation, cache).</description>

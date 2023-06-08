@@ -406,11 +406,11 @@ public:
 
     std::vector<unsigned char> convertRawImage(const unsigned char *imgdata, int res[2])
     {
-        if(exportTextureFormat == sim_gltf_texture_format_bmp)
+        if(exportTextureFormat == simgltf_texture_format_bmp)
             return raw2bmp(reinterpret_cast<const unsigned char *>(imgdata), res, 4);
-        else if(exportTextureFormat == sim_gltf_texture_format_png)
+        else if(exportTextureFormat == simgltf_texture_format_png)
             return raw2png(reinterpret_cast<const unsigned char *>(imgdata), res, 4, res[0]*4);
-        else if(exportTextureFormat == sim_gltf_texture_format_jpg)
+        else if(exportTextureFormat == simgltf_texture_format_jpg)
             return raw2jpg(reinterpret_cast<const unsigned char *>(imgdata), res, 4, 100);
         throw std::runtime_error("unsupported texture format");
     }
@@ -846,8 +846,8 @@ private:
 
     int bufferPreviewSize = 0;
 
-    TextureFormat exportTextureFormat = sim_gltf_texture_format_bmp;
+    TextureFormat exportTextureFormat = simgltf_texture_format_bmp;
 };
 
-SIM_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, Plugin)
+SIM_PLUGIN(Plugin)
 #include "stubsPlusPlus.cpp"
