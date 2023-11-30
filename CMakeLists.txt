@@ -34,11 +34,11 @@ endif()
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external)
 
-coppeliasim_generate_stubs(${CMAKE_CURRENT_BINARY_DIR}/generated XML_FILE ${CMAKE_CURRENT_SOURCE_DIR}/callbacks.xml LUA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/simGLTF.lua)
+coppeliasim_generate_stubs(${CMAKE_CURRENT_BINARY_DIR}/generated XML_FILE ${CMAKE_CURRENT_SOURCE_DIR}/sourceCode/callbacks.xml LUA_FILE ${CMAKE_CURRENT_SOURCE_DIR}/lua/simGLTF.lua)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sourceCode/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-coppeliasim_add_plugin(simGLTF SOURCES plugin.cpp)
+coppeliasim_add_plugin(simGLTF SOURCES sourceCode/plugin.cpp)
 target_link_libraries(simGLTF Boost::boost)
-coppeliasim_add_addon("simAddOnGLTF animation exporter.lua")
-coppeliasim_add_addon("simAddOnGLTF exporter.lua")
+coppeliasim_add_addon("addOns/simAddOnGLTF animation exporter.lua")
+coppeliasim_add_addon("addOns/simAddOnGLTF exporter.lua")
