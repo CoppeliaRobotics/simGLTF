@@ -40,5 +40,5 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sourceCode/config.h.in ${CMAKE_CURREN
 
 coppeliasim_add_plugin(simGLTF SOURCES sourceCode/plugin.cpp)
 target_link_libraries(simGLTF Boost::boost)
-coppeliasim_add_addon("addOns/simAddOnGLTF animation exporter.lua")
-coppeliasim_add_addon("addOns/simAddOnGLTF exporter.lua")
+coppeliasim_add_addon("addOns/GLTF animation exporter.lua")
+coppeliasim_add_addon("addOns/GLTF exporter.lua")
