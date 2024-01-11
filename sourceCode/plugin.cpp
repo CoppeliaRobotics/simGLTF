@@ -160,6 +160,14 @@ public:
 
     bool isVisible(int handle)
     {
+        int parentHandle = handle;
+        while(parentHandle != -1)
+        {
+            if(sim::getModelProperty(parentHandle) & sim_modelproperty_not_visible)
+                return false;
+            parentHandle = sim::getObjectParent(parentHandle);
+        }
+
         int visibleLayers = getVisibleLayers();
         int layers = getObjectLayers(handle);
         return visibleLayers & layers;
