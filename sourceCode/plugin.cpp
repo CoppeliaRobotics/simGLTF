@@ -480,7 +480,7 @@ public:
         sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
         struct SShapeVizInfo info;
-        int result = sim::getShapeViz(handle, 0, &info);
+        int result = sim::getShapeViz(handle | sim_handleflag_extended, 0, &info);
         bool hasTexture = result == 2;
         sim::addLog(sim_verbosity_debug, "addMesh: %s: has texture: %d (result %d)", name, hasTexture, result);
 
@@ -527,9 +527,15 @@ public:
         model.materials.push_back({});
         model.materials[mat].name = name + " material";
         model.materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
-        model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0};
+        model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0 - info.transparency};
         model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
+        model.materials[mat].doubleSided = ((info.options & 1) == 0);
+        if (info.transparency > 0.001)
+        {
+             model.materials[mat].alphaMode = "BLEND";
+             model.materials[mat].alphaCutoff = 1.0 - info.transparency;
+        }
 
         if(hasTexture)
         {
