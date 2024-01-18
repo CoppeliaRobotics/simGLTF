@@ -68,6 +68,8 @@ public:
 
         setExtVersion("glTF support");
         setBuildDate(BUILD_DATE);
+
+        initAnimationFrames();
     }
 
     void onSimulationAboutToStart()
