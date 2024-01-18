@@ -531,10 +531,10 @@ public:
         model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
         model.materials[mat].doubleSided = ((info.options & 1) == 0);
-        if (info.transparency > 0.001)
+        if (info.transparency > 0.001) // info.transparency is actually opacity
         {
              model.materials[mat].alphaMode = "BLEND";
-             model.materials[mat].alphaCutoff = 1.0 - info.transparency;
+             model.materials[mat].alphaCutoff = info.transparency;
         }
 
         if(hasTexture)
