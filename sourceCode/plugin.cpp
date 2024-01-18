@@ -527,14 +527,18 @@ public:
         model.materials.push_back({});
         model.materials[mat].name = name + " material";
         model.materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
-        model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], 1.0 - info.transparency};
+        double alpha = 1.0;
+        if (info.transparency > 0.001) // is actually opacity when different from 0.0
+            alpha = info.transparency;
+        model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], alpha};
         model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
         model.materials[mat].doubleSided = ((info.options & 1) == 0);
-        if (info.transparency > 0.001) // info.transparency is actually opacity
+        printf("Transparency: %f\n", info.transparency);
+        if (alpha < 1.0)
         {
              model.materials[mat].alphaMode = "BLEND";
-             model.materials[mat].alphaCutoff = info.transparency;
+             model.materials[mat].alphaCutoff = alpha;
         }
 
         if(hasTexture)
