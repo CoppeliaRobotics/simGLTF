@@ -536,12 +536,13 @@ public:
         model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
         model.materials[mat].doubleSided = ((info.options & 1) == 0);
-        printf("Transparency: %f\n", info.transparency);
+        /*
         if (alpha < 1.0)
         {
              model.materials[mat].alphaMode = "BLEND";
              model.materials[mat].alphaCutoff = alpha;
         }
+        */
 
         if(hasTexture)
         {
