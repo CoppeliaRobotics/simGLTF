@@ -41,11 +41,12 @@ function sysCall_afterSimulation()
         local scenePath = sim.getStringParam(sim.stringparam_scene_path)
         local sceneName = sim.getStringParam(sim.stringparam_scene_name):match("(.+)%..+")
         if sceneName == nil then sceneName = 'untitled' end
-        local fileName = (simUI.fileDialog(
+        local fileNames = simUI.fileDialog(
                              simUI.filedialog_type.save, 'Export animation to glTF...', scenePath,
                              sceneName .. '.gltf', 'glTF file', 'gltf'
-                         ))[1]
-        if fileName ~= nil then
+                         )
+        if #fileNames > 0 then
+            local fileName = fileNames[1]
             simGLTF.exportAnimation()
             simGLTF.saveASCII(fileName)
             simGLTF.recordAnimation(false)

@@ -10,11 +10,12 @@ function sysCall_init()
     local scenePath = sim.getStringParam(sim.stringparam_scene_path)
     local sceneName = sim.getStringParam(sim.stringparam_scene_name):match("(.+)%..+")
     if sceneName == nil then sceneName = 'untitled' end
-    local fileName = (simUI.fileDialog(
+    local fileNames = simUI.fileDialog(
                          simUI.filedialog_type.save, 'Export to glTF...', scenePath,
                          sceneName .. '.gltf', 'glTF file', 'gltf'
-                     ))[1]
-    if fileName == nil then return end
+                     )
+    if #fileNames == 0 then return end
+    local fileName = fileNames[1]
     local fmt, fmtName = simGLTF.getExportTextureFormat()
     sim.addLog(
         sim.verbosity_scriptinfos, 'Texture export format is set to "' .. fmtName ..
