@@ -178,19 +178,19 @@ public:
     bool isShape(int handle)
     {
         int objType = sim::getObjectType(handle);
-        return objType == sim_object_shape_type;
+        return objType == sim_sceneobject_shape;
     }
 
     bool isCamera(int handle)
     {
         int objType = sim::getObjectType(handle);
-        return objType == sim_object_camera_type;
+        return objType == sim_sceneobject_camera;
     }
 
     bool isLight(int handle)
     {
         int objType = sim::getObjectType(handle);
-        return objType == sim_object_light_type;
+        return objType == sim_sceneobject_light;
     }
 
     std::vector<int> ungroupShapeCopy(int handle)
