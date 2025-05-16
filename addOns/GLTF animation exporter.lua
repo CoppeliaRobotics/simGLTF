@@ -38,23 +38,37 @@ end
 
 function sysCall_afterSimulation()
     if simGLTF.animationFrameCount() > 0 then
-        local scenePath = sim.getStringParam(sim.stringparam_scene_path)
-        local sceneName = sim.getStringParam(sim.stringparam_scene_name):match("(.+)%..+")
-        if sceneName == nil then sceneName = 'untitled' end
-        local fileNames = simUI.fileDialog(
-                             simUI.filedialog_type.save, 'Export animation to glTF...', scenePath,
-                             sceneName .. '.gltf', 'glTF file', 'gltf'
-                         )
-        if #fileNames > 0 then
-            local fileName = fileNames[1]
+        local fileName = sim.getStringProperty(sim.handle_app, 'signal.gltfAnimExporter.saveFile', {noError = true})
+        if fileName then
+            sim.removeProperty(sim.handle_app, 'signal.gltfAnimExporter.saveFile')
+        else
+            local scenePath = sim.getStringParam(sim.stringparam_scene_path)
+            local sceneName = sim.getStringParam(sim.stringparam_scene_name):match("(.+)%..+")
+            if sceneName == nil then sceneName = 'untitled' end
+            local fileNames = simUI.fileDialog(
+                                 simUI.filedialog_type.save, 'Export animation to glTF...', scenePath,
+                                 sceneName .. '.gltf', 'glTF file', 'gltf'
+                             )
+            fileName = fileNames[1]
+        end
+        if fileName and fileName ~= '' then
             simGLTF.exportAnimation()
             simGLTF.saveASCII(fileName)
             simGLTF.recordAnimation(false)
             simGLTF.clear()
             sim.addLog(sim.verbosity_scriptinfos, 'Exported GLTF animation to ' .. fileName)
         end
-        return {cmd = 'cleanup'}
     end
+
+    local keepRunning = sim.getBoolProperty(sim.handle_app, 'signal.gltfAnimExporter.keepRunning', {noError = true})
+    if keepRunning ~= nil then
+        sim.removeProperty(sim.handle_app, 'signal.gltfAnimExporter.keepRunning')
+    end
+    if keepRunning then
+        simGLTF.recordAnimation(true)
+        return
+    end
+    return {cmd = 'cleanup'}
 end
 
 function sysCall_beforeInstanceSwitch()
