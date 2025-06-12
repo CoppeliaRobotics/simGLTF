@@ -1,4 +1,6 @@
-sim = require 'sim'
+local sim = require 'sim'
+local simGLTF
+local simUI
 
 function sysCall_info()
     return {autoStart = false, menu = 'Exporters\nGLTF exporter...'}
