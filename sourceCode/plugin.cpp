@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <simPlusPlus/Plugin.h>
+#include <simPlusPlus-2/Plugin.h>
 #include "plugin.h"
 #include "stubs.h"
 #include "config.h"
@@ -17,8 +17,6 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "external/tinygltf/tiny_gltf.h"
 
-using simUID = int;
-
 // it seems most GLTF viewers won't work with double-precision floating point buffers...
 #ifdef GLTF_DOUBLE
 using gltfFloat = double;
@@ -28,9 +26,11 @@ using gltfFloat = float;
 static const int TINYGLTF_COMPONENT_TYPE_gltfFloat = TINYGLTF_COMPONENT_TYPE_FLOAT;
 #endif
 
+using handle_t = int;
+
 struct simPose3D
 {
-    int handle;
+    handle_t handle;
     std::array<double, 3> position;
     std::array<double, 4> orientation;
     bool visible;
@@ -38,7 +38,7 @@ struct simPose3D
 
 struct simAnimTrack
 {
-    simUID uid;
+    handle_t handle;
     int nodeIndex;
     std::map<size_t, simPose3D> track;
 };
@@ -82,7 +82,7 @@ public:
         readAnimationFrame();
     }
 
-    bool getGLTFPose(int handle, int relTo, tinygltf::Node &node)
+    bool getGLTFPose(handle_t handle, handle_t relTo, tinygltf::Node &node)
     {
         auto t = sim::getObjectPosition(handle, relTo);
         auto r = sim::getObjectQuaternion(handle, relTo);
@@ -116,21 +116,21 @@ public:
         sim::releaseBuffer(b);
     }
 
-    int getVisibleLayers()
+    int getVisibilityLayers()
     {
-        return sim::getInt32Param(sim_intparam_visible_layers);
+        return sim::getIntProperty(sim_handle_scene, "visibilityLayers");
     }
 
-    std::string getObjectName(int handle)
+    std::string getObjectName(handle_t handle)
     {
         return sim::getObjectAlias(handle, 4);
     }
 
-    int getObjectLayers(int handle)
+    int getObjectLayers(handle_t handle)
     {
         try
         {
-            return sim::getObjectInt32Param(handle, sim_objintparam_visibility_layer);
+            return sim::getIntProperty(handle, "layer");
         }
         catch(...)
         {
@@ -138,68 +138,66 @@ public:
         }
     }
 
-    bool is(int handle, int param)
+    bool isCompound(handle_t handle)
     {
+        return sim::getBoolProperty(handle, "compound");
+    }
+
+    bool isWireframe(handle_t handle)
+    {
+        /*
         try
         {
-            return sim::getObjectInt32Param(handle, param) != 0;
+            return sim::getObjectInt32Param(handle, sim_shapeintparam_wireframe) != 0;
         }
         catch(...)
         {
             return false;
         }
+        */
+        return false;
     }
 
-    bool isCompound(int handle)
+    bool isVisible(handle_t handle)
     {
-        return is(handle, sim_shapeintparam_compound);
-    }
-
-    bool isWireframe(int handle)
-    {
-        return is(handle, sim_shapeintparam_wireframe);
-    }
-
-    bool isVisible(int handle)
-    {
-        int parentHandle = handle;
+        handle_t parentHandle = handle;
         while(parentHandle != -1)
         {
-            if(sim::getModelProperty(parentHandle) & sim_modelproperty_not_visible)
+            if(sim::getBoolProperty(parentHandle, "model.notVisible"))
                 return false;
-            parentHandle = sim::getObjectParent(parentHandle);
+            parentHandle = sim::getHandleProperty(parentHandle, "parent");
         }
 
-        int visibleLayers = getVisibleLayers();
+        int visibleLayers = getVisibilityLayers();
         int layers = getObjectLayers(handle);
         return visibleLayers & layers;
     }
 
-    bool isShape(int handle)
+    bool isShape(handle_t handle)
     {
-        int objType = sim::getObjectType(handle);
-        return objType == sim_sceneobject_shape;
+        std::string objType = sim::getStringProperty(handle, "objectType");
+        return objType == "shape";
     }
 
-    bool isCamera(int handle)
+    bool isCamera(handle_t handle)
     {
-        int objType = sim::getObjectType(handle);
-        return objType == sim_sceneobject_camera;
+        std::string objType = sim::getStringProperty(handle, "objectType");
+        return objType == "camera";
     }
 
-    bool isLight(int handle)
+    bool isLight(handle_t handle)
     {
-        int objType = sim::getObjectType(handle);
-        return objType == sim_sceneobject_light;
+        std::string objType = sim::getStringProperty(handle, "objectType");
+        return objType == "light";
     }
 
-    std::vector<int> ungroupShapeCopy(int handle)
+    std::vector<handle_t> ungroupShapeCopy(handle_t handle)
     {
         auto handles = sim::copyPasteObjects({handle}, 0);
         return sim::ungroupShape(handles[0]);
     }
 
-    void simPose3D_get(simPose3D *p, int handle, int relTo)
+    void simPose3D_get(simPose3D *p, handle_t handle, handle_t relTo)
     {
         p->handle = handle;
         p->position = sim::getObjectPosition(handle, relTo);
@@ -425,7 +423,7 @@ public:
         throw std::runtime_error("unsupported texture format");
     }
 
-    int addImage(int id, const void *imgdata, int res[2], const std::string &objname)
+    int addImage(handle_t id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
         {
@@ -477,7 +475,7 @@ public:
         }
     }
 
-    int addMesh(int handle, const std::string &name)
+    int addMesh(handle_t handle, const std::string &name)
     {
         sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
@@ -576,7 +574,7 @@ public:
 
     void exportShape(exportShape_in *in, exportShape_out *out)
     {
-        int obj = in->shapeHandle;
+        handle_t obj = in->shapeHandle;
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
         model.nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
@@ -585,7 +583,7 @@ public:
 
         if(isCompound(obj))
         {
-            for(int subObj : ungroupShapeCopy(obj))
+            for(handle_t subObj : ungroupShapeCopy(obj))
             {
                 if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
                 {
@@ -607,8 +605,8 @@ public:
 
     void exportObject(exportObject_in *in, exportObject_out *out)
     {
-        int visibleLayers = getVisibleLayers();
-        int obj = in->objectHandle;
+        int visibleLayers = getVisibilityLayers();
+        handle_t obj = in->objectHandle;
 
         if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
         {
@@ -625,28 +623,32 @@ public:
             model.cameras.push_back({});
             model.cameras[cameraIndex].name = getObjectName(obj);
 #if 0
-            if(sim::getObjectInt32Param(obj, sim_cameraintparam_perspective_operation))
+            if(sim::getBoolProperty(obj, "perspective"))
             {
                 model.cameras[cameraIndex].type = "perspective";
                 model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-                model.cameras[cameraIndex].perspective.yfov = sim::getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
-                model.cameras[cameraIndex].perspective.znear = sim::getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
-                model.cameras[cameraIndex].perspective.zfar = sim::getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+                model.cameras[cameraIndex].perspective.yfov = sim::getFloatProperty(obj, "viewAngle");
+                auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
+                model.cameras[cameraIndex].perspective.znear = clippingPlanes[0];
+                model.cameras[cameraIndex].perspective.zfar = clippingPlanes[1];
             }
             else
             {
                 model.cameras[cameraIndex].type = "orthographic";
-                model.cameras[cameraIndex].orthographic.xmag = sim::getObjectInt32Param(obj, sim_cameraintparam_resolution_x);
-                model.cameras[cameraIndex].orthographic.ymag = sim::getObjectInt32Param(obj, sim_cameraintparam_resolution_y);
-                model.cameras[cameraIndex].orthographic.znear = sim::getObjectFloatParam(obj, sim_camerafloatparam_near_clipping);
-                model.cameras[cameraIndex].orthographic.zfar = sim::getObjectFloatParam(obj, sim_camerafloatparam_far_clipping);
+                auto resolution = sim::getIntArray2Property(obj, "resolution");
+                model.cameras[cameraIndex].orthographic.xmag = resolution[0];
+                model.cameras[cameraIndex].orthographic.ymag = resolution[1];
+                auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
+                model.cameras[cameraIndex].orthographic.znear = clippingPlanes[0];
+                model.cameras[cameraIndex].orthographic.zfar = clippingPlanes[1];
             }
 #else
             model.cameras[cameraIndex].type = "perspective";
             model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-            model.cameras[cameraIndex].perspective.yfov = sim::getObjectFloatParam(obj, sim_camerafloatparam_perspective_angle);
-            model.cameras[cameraIndex].perspective.znear = 0.001;
-            model.cameras[cameraIndex].perspective.zfar = 1000.0;
+            model.cameras[cameraIndex].perspective.yfov = sim::getFloatProperty(obj, "viewAngle");
+            auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
+            model.cameras[cameraIndex].perspective.znear = clippingPlanes[0];
+            model.cameras[cameraIndex].perspective.zfar = clippingPlanes[1];
 #endif
             out->nodeIndex = model.nodes.size();
             model.nodes.push_back({});
@@ -668,8 +670,8 @@ public:
             int lightIndex = model.lights.size();
             model.lights.push_back({});
             model.lights[lightIndex].name = getObjectName(obj);
-            std::array<double, 3> diffuse;
-            bool lightOn = sim::getLightParameters(obj, diffuse) & 1;
+            std::array<float, 3> diffuse = sim::getColorProperty(obj, "color.diffuse");
+            bool lightOn = sim::getBoolProperty(obj, "enabled");
             model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
             model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
             model.lights[lightIndex].type = "point"; // FIXME: where to get this value from sim?
@@ -678,10 +680,10 @@ public:
         }
     }
 
-    std::vector<int> getAllObjects()
+    std::vector<handle_t> getAllObjects()
     {
-        std::vector<int> v;
-        for(int obj : sim::getObjectsInTree(sim_handle_scene, sim_handle_all))
+        std::vector<handle_t> v;
+        for(handle_t obj : sim::getHandleArrayProperty(sim_handle_scene, "objects"))
             if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
                  v.push_back(obj);
         return v;
@@ -701,7 +703,14 @@ public:
     {
         exportObjects_in args;
         args._ = in->_;
-        args.objectHandles = sim::getObjectSel();
+        auto handles = sim::getHandleArrayProperty(sim_handle_scene, "selection");
+#if 0
+        args.objectHandles = handles;
+#else
+        args.objectHandles.reserve(handles.size());
+        for(auto h : handles)
+            args.objectHandles.push_back(static_cast<int>(h));
+#endif
         if(args.objectHandles.empty()) return;
         exportObjects_out ret;
         exportObjects(&args, &ret);
@@ -712,7 +721,7 @@ public:
         exportObject_in args;
         args._ = in->_;
         exportObject_out ret;
-        for(int obj : in->objectHandles)
+        for(handle_t obj : in->objectHandles)
         {
             args.objectHandle = obj;
             exportObject(&args, &ret);
@@ -818,28 +827,27 @@ public:
 
     void readAnimationFrame()
     {
-        if(!recordAnimationFlag || sim::getSimulationState() != sim_simulation_advancing_running)
+        if(!recordAnimationFlag || sim::getIntProperty(sim_handle_scene, "simulationState") != sim_simulation_advancing_running)
             return;
 
-        double time = sim::getSimulationTime();
+        double time = sim::getFloatProperty(sim_handle_scene, "simulationTime");
         size_t timeIndex = times.size();
         times.push_back(time);
 
-        std::vector<int> allObjects = getAllObjects();
-        for(int handle : allObjects)
+        std::vector<handle_t> allObjects = getAllObjects();
+        for(handle_t handle : allObjects)
         {
-            long long int uid = sim::getObjectUid(handle);
-            auto it = frames.find(uid);
+            auto it = frames.find(handle);
             if(it == frames.end())
             {
                 exportObject_in args;
                 exportObject_out ret;
                 args.objectHandle = handle;
                 exportObject(&args, &ret);
-                frames[uid].nodeIndex = ret.nodeIndex;
+                frames[handle].nodeIndex = ret.nodeIndex;
             }
 
-            simPose3D_get(&frames[uid].track[timeIndex], handle, -1);
+            simPose3D_get(&frames[handle].track[timeIndex], handle, -1);
         }
     }
 
@@ -858,10 +866,10 @@ private:
     tinygltf::TinyGLTF gltf;
     tinygltf::Model model;
 
-    std::map<int, int> textureMap;
+    std::map<handle_t, int> textureMap;
 
     // for animation data:
-    std::map<simUID, simAnimTrack> frames;
+    std::map<handle_t, simAnimTrack> frames;
     std::vector<gltfFloat> times;
     bool recordAnimationFlag = false;
 
