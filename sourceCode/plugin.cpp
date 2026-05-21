@@ -26,11 +26,11 @@ using gltfFloat = float;
 static const int TINYGLTF_COMPONENT_TYPE_gltfFloat = TINYGLTF_COMPONENT_TYPE_FLOAT;
 #endif
 
-using handle_t = int;
+using _handle_t = int;
 
 struct simPose3D
 {
-    handle_t handle;
+    _handle_t handle;
     std::array<double, 3> position;
     std::array<double, 4> orientation;
     bool visible;
@@ -38,7 +38,7 @@ struct simPose3D
 
 struct simAnimTrack
 {
-    handle_t handle;
+    _handle_t handle;
     int nodeIndex;
     std::map<size_t, simPose3D> track;
 };
@@ -82,7 +82,7 @@ public:
         readAnimationFrame();
     }
 
-    bool getGLTFPose(handle_t handle, handle_t relTo, tinygltf::Node &node)
+    bool getGLTFPose(_handle_t handle, _handle_t relTo, tinygltf::Node &node)
     {
         auto t = sim::getObjectPosition(handle, relTo);
         auto r = sim::getObjectQuaternion(handle, relTo);
@@ -121,12 +121,12 @@ public:
         return sim::getIntProperty(sim_handle_scene, "visibilityLayers");
     }
 
-    std::string getObjectName(handle_t handle)
+    std::string getObjectName(_handle_t handle)
     {
         return sim::getObjectAlias(handle, 4);
     }
 
-    int getObjectLayers(handle_t handle)
+    int getObjectLayers(_handle_t handle)
     {
         try
         {
@@ -138,12 +138,12 @@ public:
         }
     }
 
-    bool isCompound(handle_t handle)
+    bool isCompound(_handle_t handle)
     {
         return sim::getBoolProperty(handle, "compound");
     }
 
-    bool isWireframe(handle_t handle)
+    bool isWireframe(_handle_t handle)
     {
         /*
         try
@@ -158,9 +158,9 @@ public:
         return false;
     }
 
-    bool isVisible(handle_t handle)
+    bool isVisible(_handle_t handle)
     {
-        handle_t parentHandle = handle;
+        _handle_t parentHandle = handle;
         while(parentHandle != -1)
         {
             if(sim::getBoolProperty(parentHandle, "model.notVisible"))
@@ -173,31 +173,31 @@ public:
         return visibleLayers & layers;
     }
 
-    bool isShape(handle_t handle)
+    bool isShape(_handle_t handle)
     {
         std::string objType = sim::getStringProperty(handle, "objectType");
         return objType == "shape";
     }
 
-    bool isCamera(handle_t handle)
+    bool isCamera(_handle_t handle)
     {
         std::string objType = sim::getStringProperty(handle, "objectType");
         return objType == "camera";
     }
 
-    bool isLight(handle_t handle)
+    bool isLight(_handle_t handle)
     {
         std::string objType = sim::getStringProperty(handle, "objectType");
         return objType == "light";
     }
 
-    std::vector<handle_t> ungroupShapeCopy(handle_t handle)
+    std::vector<_handle_t> ungroupShapeCopy(_handle_t handle)
     {
         auto handles = sim::copyPasteObjects({handle}, 0);
         return sim::ungroupShape(handles[0]);
     }
 
-    void simPose3D_get(simPose3D *p, handle_t handle, handle_t relTo)
+    void simPose3D_get(simPose3D *p, _handle_t handle, _handle_t relTo)
     {
         p->handle = handle;
         p->position = sim::getObjectPosition(handle, relTo);
@@ -423,7 +423,7 @@ public:
         throw std::runtime_error("unsupported texture format");
     }
 
-    int addImage(handle_t id, const void *imgdata, int res[2], const std::string &objname)
+    int addImage(_handle_t id, const void *imgdata, int res[2], const std::string &objname)
     {
         if(textureMap.find(id) != textureMap.end())
         {
@@ -475,7 +475,7 @@ public:
         }
     }
 
-    int addMesh(handle_t handle, const std::string &name)
+    int addMesh(_handle_t handle, const std::string &name)
     {
         sim::addLog(sim_verbosity_debug, "addMesh: %s: adding mesh for shape handle %d", name, handle);
 
@@ -574,7 +574,7 @@ public:
 
     void exportShape(exportShape_in *in, exportShape_out *out)
     {
-        handle_t obj = in->shapeHandle;
+        _handle_t obj = in->shapeHandle;
         out->nodeIndex = model.nodes.size();
         model.nodes.push_back({});
         model.nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
@@ -583,7 +583,7 @@ public:
 
         if(isCompound(obj))
         {
-            for(handle_t subObj : ungroupShapeCopy(obj))
+            for(_handle_t subObj : ungroupShapeCopy(obj))
             {
                 if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
                 {
@@ -606,7 +606,7 @@ public:
     void exportObject(exportObject_in *in, exportObject_out *out)
     {
         int visibleLayers = getVisibilityLayers();
-        handle_t obj = in->objectHandle;
+        _handle_t obj = in->objectHandle;
 
         if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
         {
@@ -680,10 +680,10 @@ public:
         }
     }
 
-    std::vector<handle_t> getAllObjects()
+    std::vector<_handle_t> getAllObjects()
     {
-        std::vector<handle_t> v;
-        for(handle_t obj : sim::getHandleArrayProperty(sim_handle_scene, "objects"))
+        std::vector<_handle_t> v;
+        for(_handle_t obj : sim::getHandleArrayProperty(sim_handle_scene, "objects"))
             if((isShape(obj) && isVisible(obj) && !isWireframe(obj)) || isCamera(obj))
                  v.push_back(obj);
         return v;
@@ -721,7 +721,7 @@ public:
         exportObject_in args;
         args._ = in->_;
         exportObject_out ret;
-        for(handle_t obj : in->objectHandles)
+        for(_handle_t obj : in->objectHandles)
         {
             args.objectHandle = obj;
             exportObject(&args, &ret);
@@ -834,8 +834,8 @@ public:
         size_t timeIndex = times.size();
         times.push_back(time);
 
-        std::vector<handle_t> allObjects = getAllObjects();
-        for(handle_t handle : allObjects)
+        std::vector<_handle_t> allObjects = getAllObjects();
+        for(_handle_t handle : allObjects)
         {
             auto it = frames.find(handle);
             if(it == frames.end())
@@ -866,10 +866,10 @@ private:
     tinygltf::TinyGLTF gltf;
     tinygltf::Model model;
 
-    std::map<handle_t, int> textureMap;
+    std::map<_handle_t, int> textureMap;
 
     // for animation data:
-    std::map<handle_t, simAnimTrack> frames;
+    std::map<_handle_t, simAnimTrack> frames;
     std::vector<gltfFloat> times;
     bool recordAnimationFlag = false;
 
