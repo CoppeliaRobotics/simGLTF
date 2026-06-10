@@ -66,9 +66,6 @@ public:
         char *ps = std::getenv("COPPELIASIM_GLTF_BUFFER_PREVIEW");
         if(ps) bufferPreviewSize = std::atoi(ps);
 
-        setExtVersion("glTF support");
-        setBuildDate(BUILD_DATE);
-
         initAnimationFrames();
     }
 
