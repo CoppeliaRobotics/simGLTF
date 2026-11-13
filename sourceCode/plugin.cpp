@@ -40,7 +40,9 @@ struct simAnimTrack
 {
     _handle_t handle;
     int nodeIndex;
+    _handle_t parentHandle;
     std::map<size_t, simPose3D> track;
+    std::map<size_t, simPose3D> intrinsicTrack; // only used for joints
 };
 
 template <typename T>
@@ -176,6 +178,12 @@ public:
         return objType == "shape";
     }
 
+    bool isJoint(_handle_t handle)
+    {
+        std::string objType = sim::getStringProperty(handle, "objectType");
+        return objType == "joint";
+    }
+
     bool isCamera(_handle_t handle)
     {
         std::string objType = sim::getStringProperty(handle, "objectType");
@@ -231,6 +239,9 @@ public:
     void clear(clear_in *in, clear_out *out)
     {
         textureMap.clear();
+        handleToNode.clear();
+        handleToMeshNode.clear();
+        handleToChildParent.clear();
 
         model.accessors.clear();
         model.animations.clear();
@@ -344,7 +355,7 @@ public:
 
     static void stbi_write_func_vector(void* context, void* data, int size)
     {
-        for (int i = 0; i < size; ++i)
+        for(int i = 0; i < size; ++i)
         {
             ((std::vector<unsigned char>*)context)->push_back(*(reinterpret_cast<unsigned char *>(data) + i));
         }
@@ -525,14 +536,14 @@ public:
         model.materials[mat].name = name + " material";
         model.materials[mat].emissiveFactor = {emission[0], emission[1], emission[2]};
         double alpha = 1.0;
-        if (info.transparency > 0.001) // is actually opacity when different from 0.0
+        if(info.transparency > 0.001) // is actually opacity when different from 0.0
             alpha = info.transparency;
         model.materials[mat].pbrMetallicRoughness.baseColorFactor = {diffuse[0], diffuse[1], diffuse[2], alpha};
         model.materials[mat].pbrMetallicRoughness.metallicFactor = 0.1;
         model.materials[mat].pbrMetallicRoughness.roughnessFactor = 0.5;
         model.materials[mat].doubleSided = ((info.options & 1) == 0);
         /*
-        if (alpha < 1.0)
+        if(alpha < 1.0)
         {
              model.materials[mat].alphaMode = "BLEND";
              model.materials[mat].alphaCutoff = alpha;
@@ -571,110 +582,32 @@ public:
 
     void exportShape(exportShape_in *in, exportShape_out *out)
     {
-        _handle_t obj = in->shapeHandle;
-        out->nodeIndex = model.nodes.size();
-        model.nodes.push_back({});
-        model.nodes[in->parentNodeIndex].children.push_back(out->nodeIndex);
-        model.nodes[out->nodeIndex].name = getObjectName(obj);
-        getGLTFPose(obj, in->parentHandle, model.nodes[out->nodeIndex]);
-
-        if(isCompound(obj))
-        {
-            for(_handle_t subObj : ungroupShapeCopy(obj))
-            {
-                if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
-                {
-                    exportShape_in args;
-                    args._ = in->_;
-                    args.shapeHandle = subObj;
-                    args.parentHandle = obj;
-                    args.parentNodeIndex = out->nodeIndex;
-                    exportShape_out ret;
-                    exportShape(&args, &ret);
-                }
-                sim::removeObjects({subObj});
-            }
-            return;
-        }
-
-        model.nodes[out->nodeIndex].mesh = addMesh(obj, model.nodes[out->nodeIndex].name);
+        // parentHandle / parentNodeIndex from the stub are ignored:
+        // the real CoppeliaSim hierarchy is used.
+        out->nodeIndex = ensureNode(in->shapeHandle);
     }
 
     void exportObject(exportObject_in *in, exportObject_out *out)
     {
-        int visibleLayers = getVisibilityLayers();
-        _handle_t obj = in->objectHandle;
+        out->nodeIndex = ensureNode(in->objectHandle);
+    }
 
-        if(isShape(obj) && isVisible(obj) && !isWireframe(obj))
-        {
-            exportShape_in args;
-            args._ = in->_;
-            args.shapeHandle = obj;
-            exportShape_out ret;
-            exportShape(&args, &ret);
-            out->nodeIndex = ret.nodeIndex;
-        }
-        else if(isCamera(obj))
-        {
-            int cameraIndex = model.cameras.size();
-            model.cameras.push_back({});
-            model.cameras[cameraIndex].name = getObjectName(obj);
-#if 0
-            if(sim::getBoolProperty(obj, "perspective"))
-            {
-                model.cameras[cameraIndex].type = "perspective";
-                model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-                model.cameras[cameraIndex].perspective.yfov = sim::getFloatProperty(obj, "viewAngle");
-                auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
-                model.cameras[cameraIndex].perspective.znear = clippingPlanes[0];
-                model.cameras[cameraIndex].perspective.zfar = clippingPlanes[1];
-            }
-            else
-            {
-                model.cameras[cameraIndex].type = "orthographic";
-                auto resolution = sim::getIntArray2Property(obj, "resolution");
-                model.cameras[cameraIndex].orthographic.xmag = resolution[0];
-                model.cameras[cameraIndex].orthographic.ymag = resolution[1];
-                auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
-                model.cameras[cameraIndex].orthographic.znear = clippingPlanes[0];
-                model.cameras[cameraIndex].orthographic.zfar = clippingPlanes[1];
-            }
-#else
-            model.cameras[cameraIndex].type = "perspective";
-            model.cameras[cameraIndex].perspective.aspectRatio = 16/9.;
-            model.cameras[cameraIndex].perspective.yfov = sim::getFloatProperty(obj, "viewAngle");
-            auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
-            model.cameras[cameraIndex].perspective.znear = clippingPlanes[0];
-            model.cameras[cameraIndex].perspective.zfar = clippingPlanes[1];
-#endif
-            out->nodeIndex = model.nodes.size();
-            model.nodes.push_back({});
-            model.nodes[0].children.push_back(out->nodeIndex);
-            int cameraOrientationFixNode = model.nodes.size();
-            model.nodes.push_back({});
-            model.nodes[out->nodeIndex].name = getObjectName(obj) + " camera node";
-            model.nodes[out->nodeIndex].children.push_back(cameraOrientationFixNode);
-            model.nodes[cameraOrientationFixNode].matrix = {-1,  0,  0,  0,
-                                                             0,  1,  0,  0,
-                                                             0,  0, -1,  0,
-                                                             0,  0,  0,  1};
-            model.nodes[cameraOrientationFixNode].camera = cameraIndex;
-            model.nodes[cameraOrientationFixNode].name = getObjectName(obj) + " camera node [rot fix]";
-            getGLTFPose(obj, -1, model.nodes[out->nodeIndex]);
-        }
-        else if(isLight(obj))
-        {
-            int lightIndex = model.lights.size();
-            model.lights.push_back({});
-            model.lights[lightIndex].name = getObjectName(obj);
-            std::array<float, 3> diffuse = sim::getColorProperty(obj, "color.diffuse");
-            bool lightOn = sim::getBoolProperty(obj, "enabled");
-            model.lights[lightIndex].color = {diffuse[0], diffuse[1], diffuse[2]};
-            model.lights[lightIndex].intensity = 1.0; // FIXME: where to get this value from sim?
-            model.lights[lightIndex].type = "point"; // FIXME: where to get this value from sim?
-            model.lights[lightIndex].range = 1.0; // FIXME: where to get this value from sim?
-            out->nodeIndex = lightIndex;
-        }
+    void exportObjects(exportObjects_in *in, exportObjects_out *out)
+    {
+        for(_handle_t obj : in->objectHandles)
+            ensureNode(obj);
+    }
+
+    void exportAllObjects(exportAllObjects_in *in, exportAllObjects_out *out)
+    {
+        for(_handle_t obj : getAllObjects())
+            ensureNode(obj);
+    }
+
+    void exportSelectedObjects(exportSelectedObjects_in *in, exportSelectedObjects_out *out)
+    {
+        for(_handle_t h : sim::getHandleArrayProperty(sim_handle_scene, "selection"))
+            ensureNode(static_cast<int>(h));
     }
 
     std::vector<_handle_t> getAllObjects()
@@ -686,75 +619,31 @@ public:
         return v;
     }
 
-    void exportAllObjects(exportAllObjects_in *in, exportAllObjects_out *out)
-    {
-        exportObjects_in args;
-        args._ = in->_;
-        args.objectHandles = getAllObjects();
-        if(args.objectHandles.empty()) return;
-        exportObjects_out ret;
-        exportObjects(&args, &ret);
-    }
-
-    void exportSelectedObjects(exportSelectedObjects_in *in, exportSelectedObjects_out *out)
-    {
-        exportObjects_in args;
-        args._ = in->_;
-        auto handles = sim::getHandleArrayProperty(sim_handle_scene, "selection");
-#if 0
-        args.objectHandles = handles;
-#else
-        args.objectHandles.reserve(handles.size());
-        for(auto h : handles)
-            args.objectHandles.push_back(static_cast<int>(h));
-#endif
-        if(args.objectHandles.empty()) return;
-        exportObjects_out ret;
-        exportObjects(&args, &ret);
-    }
-
-    void exportObjects(exportObjects_in *in, exportObjects_out *out)
-    {
-        exportObject_in args;
-        args._ = in->_;
-        exportObject_out ret;
-        for(_handle_t obj : in->objectHandles)
-        {
-            args.objectHandle = obj;
-            exportObject(&args, &ret);
-        }
-    }
-
     void exportAnimation(exportAnimation_in *in, exportAnimation_out *out)
     {
+        if(times.empty()) return;
+
         model.animations.resize(1);
 
-        // create time buffer:
         int n = times.size();
         int bt = addBuffer(times.data(), sizeof(gltfFloat) * n, "time");
         int vt = addBufferView(bt, sizeof(gltfFloat) * n, 0, "time");
         std::vector<double> tmin, tmax;
         minMaxVec(times, 1, tmin, tmax);
-        int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_SCALAR, n, tmin, tmax, "time");
+        int at = addAccessor(vt, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_SCALAR,
+                            n, tmin, tmax, "time");
 
         for(auto &frame : frames)
         {
             simAnimTrack &track = frame.second;
-
-            // for each object we need two channels: translation and rotation
-            int ip = model.animations[0].channels.size();
-            model.animations[0].channels.push_back({});
-            model.animations[0].samplers.push_back({});
-            int ir = model.animations[0].channels.size();
-            model.animations[0].channels.push_back({});
-            model.animations[0].samplers.push_back({});
-            // XXX: animate visibility with scale channel
-            int is = model.animations[0].channels.size();
-            model.animations[0].channels.push_back({});
-            model.animations[0].samplers.push_back({});
-
-            // create translation and rotation buffers:
+            _handle_t handle = frame.first;                       // NOTE: use the key
             std::string name = model.nodes[track.nodeIndex].name;
+
+            // Scale (visibility) goes on the mesh child if this shape was split,
+            // otherwise on the node itself (leaf shape / camera / joint / light).
+            auto mit = handleToMeshNode.find(handle);
+            int scaleTarget = (mit != handleToMeshNode.end()) ? mit->second : track.nodeIndex;
+
             std::vector<gltfFloat> p(n * 3), r(n * 4), s(n * 3);
             for(int i = 0; i < n; i++)
             {
@@ -767,43 +656,115 @@ public:
                     s[3 * i + j] = exists && track.track[i].visible ? 1.0 : 0.0;
             }
 
-            int bp = addBuffer(p.data(), sizeof(gltfFloat) * n * 3, name + " position");
-            int vp = addBufferView(bp, sizeof(gltfFloat) * n * 3, 0, name + " position");
-            std::vector<double> pmin, pmax;
-            minMaxVec(p, 3, pmin, pmax);
-            int ap = addAccessor(vp, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC3, n, pmin, pmax, name + " position");
+            // --- translation ---
+            {
+                int c = model.animations[0].channels.size();
+                model.animations[0].channels.push_back({});
+                model.animations[0].samplers.push_back({});
+                int b = addBuffer(p.data(), sizeof(gltfFloat) * n * 3, name + " position");
+                int v = addBufferView(b, sizeof(gltfFloat) * n * 3, 0, name + " position");
+                std::vector<double> mn, mx; minMaxVec(p, 3, mn, mx);
+                int a = addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC3,
+                                    n, mn, mx, name + " position");
+                model.animations[0].samplers[c].interpolation = "STEP";
+                model.animations[0].samplers[c].input  = at;
+                model.animations[0].samplers[c].output = a;
+                model.animations[0].channels[c].sampler     = c;
+                model.animations[0].channels[c].target_node = track.nodeIndex;
+                model.animations[0].channels[c].target_path = "translation";
+            }
 
-            int br = addBuffer(r.data(), sizeof(gltfFloat) * n * 4, name + " rotation");
-            int vr = addBufferView(br, sizeof(gltfFloat) * n * 4, 0, name + " rotation");
-            std::vector<double> rmin, rmax;
-            minMaxVec(r, 4, rmin, rmax);
-            int ar = addAccessor(vr, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC4, n, rmin, rmax, name + " rotation");
+            // --- rotation ---
+            {
+                int c = model.animations[0].channels.size();
+                model.animations[0].channels.push_back({});
+                model.animations[0].samplers.push_back({});
+                int b = addBuffer(r.data(), sizeof(gltfFloat) * n * 4, name + " rotation");
+                int v = addBufferView(b, sizeof(gltfFloat) * n * 4, 0, name + " rotation");
+                std::vector<double> mn, mx; minMaxVec(r, 4, mn, mx);
+                int a = addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC4,
+                                    n, mn, mx, name + " rotation");
+                model.animations[0].samplers[c].interpolation = "STEP";
+                model.animations[0].samplers[c].input  = at;
+                model.animations[0].samplers[c].output = a;
+                model.animations[0].channels[c].sampler     = c;
+                model.animations[0].channels[c].target_node = track.nodeIndex;
+                model.animations[0].channels[c].target_path = "rotation";
+            }
 
-            int bs = addBuffer(s.data(), sizeof(gltfFloat) * n * 3, name + " scale");
-            int vs = addBufferView(bs, sizeof(gltfFloat) * n * 3, 0, name + " scale");
-            std::vector<double> smin, smax;
-            minMaxVec(s, 3, smin, smax);
-            int as = addAccessor(vs, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC3, n, smin, smax, name + " scale");
+            // --- scale (target = mesh child if split, otherwise the node itself) ---
+            {
+                int c = model.animations[0].channels.size();
+                model.animations[0].channels.push_back({});
+                model.animations[0].samplers.push_back({});
+                int b = addBuffer(s.data(), sizeof(gltfFloat) * n * 3, name + " scale");
+                int v = addBufferView(b, sizeof(gltfFloat) * n * 3, 0, name + " scale");
+                std::vector<double> mn, mx; minMaxVec(s, 3, mn, mx);
+                int a = addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC3,
+                                    n, mn, mx, name + " scale");
+                model.animations[0].samplers[c].interpolation = "STEP";
+                model.animations[0].samplers[c].input  = at;
+                model.animations[0].samplers[c].output = a;
+                model.animations[0].channels[c].sampler     = c;
+                model.animations[0].channels[c].target_node = scaleTarget;
+                model.animations[0].channels[c].target_path = "scale";
+            }
 
-            // create samplers & channels:
-            model.animations[0].samplers[ip].interpolation = "STEP";
-            model.animations[0].samplers[ip].input = at;
-            model.animations[0].samplers[ip].output = ap;
-            model.animations[0].channels[ip].sampler = ip;
-            model.animations[0].channels[ip].target_node = track.nodeIndex;
-            model.animations[0].channels[ip].target_path = "translation";
-            model.animations[0].samplers[ir].interpolation = "STEP";
-            model.animations[0].samplers[ir].input = at;
-            model.animations[0].samplers[ir].output = ar;
-            model.animations[0].channels[ir].sampler = ir;
-            model.animations[0].channels[ir].target_node = track.nodeIndex;
-            model.animations[0].channels[ir].target_path = "rotation";
-            model.animations[0].samplers[is].interpolation = "STEP";
-            model.animations[0].samplers[is].input = at;
-            model.animations[0].samplers[is].output = as;
-            model.animations[0].channels[is].sampler = is;
-            model.animations[0].channels[is].target_node = track.nodeIndex;
-            model.animations[0].channels[is].target_path = "scale";
+            // for joints, also animate the child frame with the intrinsic pose
+            if(isJoint(handle))
+            {
+                auto cpit = handleToChildParent.find(handle);
+                if(cpit != handleToChildParent.end())
+                {
+                    int childFrameNode = cpit->second;
+
+                    std::vector<gltfFloat> cp(n * 3), cr(n * 4);
+                    for(int i = 0; i < n; i++)
+                    {
+                        bool exists = track.intrinsicTrack.find(i) != track.intrinsicTrack.end();
+                        for(int j = 0; j < 3; j++)
+                            cp[3 * i + j] = exists ? track.intrinsicTrack[i].position[j] : 0.0;
+                        for(int j = 0; j < 4; j++)
+                            cr[4 * i + j] = exists ? track.intrinsicTrack[i].orientation[j] : 0.0;
+                    }
+
+                    // --- intrinsic translation ---
+                    {
+                        int c = model.animations[0].channels.size();
+                        model.animations[0].channels.push_back({});
+                        model.animations[0].samplers.push_back({});
+                        int b = addBuffer(cp.data(), sizeof(gltfFloat) * n * 3, name + " joint translation");
+                        int v = addBufferView(b, sizeof(gltfFloat) * n * 3, 0, name + " joint translation");
+                        std::vector<double> mn, mx; minMaxVec(cp, 3, mn, mx);
+                        int a = addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC3,
+                                            n, mn, mx, name + " joint translation");
+                        model.animations[0].samplers[c].interpolation = "STEP";
+                        model.animations[0].samplers[c].input  = at;
+                        model.animations[0].samplers[c].output = a;
+                        model.animations[0].channels[c].sampler     = c;
+                        model.animations[0].channels[c].target_node = childFrameNode;
+                        model.animations[0].channels[c].target_path = "translation";
+                    }
+
+                    // --- intrinsic rotation ---
+                    {
+                        int c = model.animations[0].channels.size();
+                        model.animations[0].channels.push_back({});
+                        model.animations[0].samplers.push_back({});
+                        int b = addBuffer(cr.data(), sizeof(gltfFloat) * n * 4, name + " joint rotation");
+                        int v = addBufferView(b, sizeof(gltfFloat) * n * 4, 0, name + " joint rotation");
+                        std::vector<double> mn, mx; minMaxVec(cr, 4, mn, mx);
+                        int a = addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat, TINYGLTF_TYPE_VEC4,
+                                            n, mn, mx, name + " joint rotation");
+                        model.animations[0].samplers[c].interpolation = "STEP";
+                        model.animations[0].samplers[c].input  = at;
+                        model.animations[0].samplers[c].output = a;
+                        model.animations[0].channels[c].sampler     = c;
+                        model.animations[0].channels[c].target_node = childFrameNode;
+                        model.animations[0].channels[c].target_path = "rotation";
+                    }
+                }
+            }
         }
     }
 
@@ -831,20 +792,45 @@ public:
         size_t timeIndex = times.size();
         times.push_back(time);
 
-        std::vector<_handle_t> allObjects = getAllObjects();
-        for(_handle_t handle : allObjects)
+        // Make sure nodes exist for all currently-visible objects
+        // (and their ancestors — ensureNode recurses).
+        for(_handle_t handle : getAllObjects())
+            ensureNode(handle);
+
+        // Record local poses for *every* node we know about, so that
+        // dummy nodes (joints, sensors, invisible parents) are animated too.
+        // std::map iterators are stable; no insertion happens during the loop.
+        for(auto &pair : handleToNode)
         {
-            auto it = frames.find(handle);
-            if(it == frames.end())
+            _handle_t handle = pair.first;
+            int nodeIndex = pair.second;
+
+            if(frames.find(handle) == frames.end())
             {
-                exportObject_in args;
-                exportObject_out ret;
-                args.objectHandle = handle;
-                exportObject(&args, &ret);
-                frames[handle].nodeIndex = ret.nodeIndex;
+                frames[handle].nodeIndex    = nodeIndex;
+                frames[handle].parentHandle = getParentHandle(handle);
             }
 
-            simPose3D_get(&frames[handle].track[timeIndex], handle, -1);
+            try
+            {
+                simPose3D_get(&frames[handle].track[timeIndex], handle, frames[handle].parentHandle);
+
+                // for joints, also record the intrinsic pose (drives the child frame)
+                if(isJoint(handle))
+                {
+                    auto pose = sim::getPoseProperty(handle, "intrinsicPose");
+                    simPose3D &p = frames[handle].intrinsicTrack[timeIndex];
+                    p.handle      = handle;
+                    p.position    = {pose[0], pose[1], pose[2]};
+                    p.orientation = {pose[3], pose[4], pose[5], pose[6]};
+                    p.visible     = true;
+                }
+            }
+            catch(...)
+            {
+                // Handle disappeared (deleted mid-sim). Leave the frame
+                // missing so that exportAnimation emits scale=(0,0,0).
+            }
         }
     }
 
@@ -860,6 +846,176 @@ public:
     }
 
 private:
+    std::map<_handle_t, int> handleToNode;
+    std::map<_handle_t, int> handleToMeshNode;
+    std::map<_handle_t, int> handleToChildParent; // where to attach children (joints)
+
+    _handle_t getParentHandle(_handle_t h)
+    {
+        return sim::getHandleProperty(h, "parent");
+    }
+
+    // If `shapeHandle` is a shape that has just become a parent, split its node
+    // into a hierarchy dummy + a child mesh node carrying the visual content.
+    // The child node is what gets the scale animation; the parent node stays at
+    // scale 1 so that hierarchy children (joints, links, …) remain visible.
+    void maybeSplitShapeNode(_handle_t shapeHandle, int shapeNodeIndex)
+    {
+        if(!isShape(shapeHandle)) return;
+        if(handleToMeshNode.find(shapeHandle) != handleToMeshNode.end()) return;
+
+        int meshNode = model.nodes.size();
+        model.nodes.push_back({});
+        model.nodes[meshNode].name = model.nodes[shapeNodeIndex].name + " [mesh]";
+
+        // 1. Move the node's own mesh, if any (non-compound, visible shape).
+        if(model.nodes[shapeNodeIndex].mesh >= 0)
+        {
+            model.nodes[meshNode].mesh       = model.nodes[shapeNodeIndex].mesh;
+            model.nodes[shapeNodeIndex].mesh = -1;
+        }
+
+        // 2. Move any mesh-carrying children (a visible compound's sub-meshes)
+        //    under the new mesh node, so that scaling the mesh child hides them
+        //    while the compound node itself (and its non-mesh children, if any)
+        //    are unaffected.
+        auto &parentChildren = model.nodes[shapeNodeIndex].children;
+        for(auto it = parentChildren.begin(); it != parentChildren.end();)
+        {
+            int child = *it;
+            if(model.nodes[child].mesh >= 0)
+            {
+                model.nodes[meshNode].children.push_back(child);
+                it = parentChildren.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        model.nodes[shapeNodeIndex].children.push_back(meshNode);
+        handleToMeshNode[shapeHandle] = meshNode;
+    }
+
+    // Ensure a glTF node exists for the given handle (and its ancestors),
+    // and return its node index.
+    int ensureNode(_handle_t handle)
+    {
+        auto it = handleToNode.find(handle);
+        if(it != handleToNode.end())
+            return it->second;
+
+        _handle_t parentHandle = getParentHandle(handle);
+
+        int parentNodeIndex = 0;
+        if(parentHandle != -1)
+        {
+            int parentPrimaryNode = ensureNode(parentHandle);
+            maybeSplitShapeNode(parentHandle, parentPrimaryNode);
+            // Children of a joint attach to the joint's child frame, not the joint frame
+            auto cpit = handleToChildParent.find(parentHandle);
+            parentNodeIndex = (cpit != handleToChildParent.end())
+                            ? cpit->second
+                            : parentPrimaryNode;
+        }
+
+        int nodeIndex = model.nodes.size();
+        model.nodes.push_back({});
+        model.nodes[parentNodeIndex].children.push_back(nodeIndex);
+        model.nodes[nodeIndex].name = getObjectName(handle);
+        getGLTFPose(handle, parentHandle, model.nodes[nodeIndex]);
+
+        handleToNode[handle] = nodeIndex;
+
+        // joints get an extra child-frame node that will carry the intrinsic pose
+        if(isJoint(handle))
+        {
+            int childFrameNode = model.nodes.size();
+            model.nodes.push_back({});
+            model.nodes[nodeIndex].children.push_back(childFrameNode);
+            model.nodes[childFrameNode].name = model.nodes[nodeIndex].name + " [joint child frame]";
+            // Initial transform is identity; the animation will drive it.
+            handleToChildParent[handle] = childFrameNode;
+        }
+
+        if(isShape(handle) && isVisible(handle) && !isWireframe(handle))
+            exportShapeContent(handle, nodeIndex);
+        else if(isCamera(handle))
+            exportCameraContent(handle, nodeIndex);
+        else if(isLight(handle))
+            exportLightContent(handle, nodeIndex);
+        // else: dummy node
+
+        return nodeIndex;
+    }
+
+    void exportShapeContent(_handle_t obj, int nodeIndex)
+    {
+        if(isCompound(obj))
+        {
+            for(_handle_t subObj : ungroupShapeCopy(obj))
+            {
+                if(isVisible(subObj) && isShape(subObj) && !isWireframe(subObj))
+                {
+                    int subNode = model.nodes.size();
+                    model.nodes.push_back({});
+                    model.nodes[nodeIndex].children.push_back(subNode);
+                    model.nodes[subNode].name = getObjectName(subObj);
+                    getGLTFPose(subObj, obj, model.nodes[subNode]);
+                    model.nodes[subNode].mesh = addMesh(subObj, model.nodes[subNode].name);
+                }
+                sim::removeObjects({subObj});
+            }
+            return;
+        }
+        model.nodes[nodeIndex].mesh = addMesh(obj, model.nodes[nodeIndex].name);
+    }
+
+    void exportCameraContent(_handle_t obj, int nodeIndex)
+    {
+        int cameraIndex = model.cameras.size();
+        model.cameras.push_back({});
+        model.cameras[cameraIndex].name = getObjectName(obj);
+        model.cameras[cameraIndex].type = "perspective";
+        model.cameras[cameraIndex].perspective.aspectRatio = 16 / 9.;
+        model.cameras[cameraIndex].perspective.yfov =
+            sim::getFloatProperty(obj, "viewAngle");
+        auto clippingPlanes = sim::getFloatArrayProperty(obj, "clippingPlanes");
+        model.cameras[cameraIndex].perspective.znear = clippingPlanes[0];
+        model.cameras[cameraIndex].perspective.zfar  = clippingPlanes[1];
+
+        model.nodes[nodeIndex].name = getObjectName(obj) + " camera node";
+
+        // camera-as-such must live on a child node with an orientation fix,
+        // so that any children of the camera in CoppeliaSim remain siblings
+        // of the fix node (i.e. untouched by the fix).
+        int fixNode = model.nodes.size();
+        model.nodes.push_back({});
+        model.nodes[nodeIndex].children.push_back(fixNode);
+        model.nodes[fixNode].name = getObjectName(obj) + " [camera rot fix]";
+        model.nodes[fixNode].matrix = { -1, 0, 0, 0,
+                                         0, 1, 0, 0,
+                                         0, 0,-1, 0,
+                                         0, 0, 0, 1 };
+        model.nodes[fixNode].camera = cameraIndex;
+    }
+
+    void exportLightContent(_handle_t obj, int nodeIndex)
+    {
+        int lightIndex = model.lights.size();
+        model.lights.push_back({});
+        model.lights[lightIndex].name = getObjectName(obj);
+        auto diffuse = sim::getColorProperty(obj, "color.diffuse");
+        model.lights[lightIndex].color     = { diffuse[0], diffuse[1], diffuse[2] };
+        model.lights[lightIndex].intensity = 1.0;   // FIXME
+        model.lights[lightIndex].type      = "point"; // FIXME
+        model.lights[lightIndex].range     = 1.0;   // FIXME
+        // glTF 2.0 core has no lights; data is currently orphaned.
+        // Node stays a dummy (pose only), so hierarchy is preserved.
+        model.nodes[nodeIndex].name = getObjectName(obj) + " [light]";
+    }
+
     tinygltf::TinyGLTF gltf;
     tinygltf::Model model;
 
