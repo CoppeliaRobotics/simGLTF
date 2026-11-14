@@ -160,7 +160,7 @@
         </return>
     </command>
     <command name="setExportTextureFormat">
-        <description>Set the image format (bmp, png, jpg) in which textures are exported.</description>
+        <description>Set the image format in which textures are exported. glTF only supports PNG and JPEG; requesting BMP falls back to PNG.</description>
         <params>
             <param name="textureFormat" type="int">
                 <description>Format of exported texture images. See <enum-ref name="TextureFormat" />.</description>
@@ -170,7 +170,7 @@
         </return>
     </command>
     <command name="getExportTextureFormat">
-        <description>Set the image format (bmp, png, jpg) in which textures are exported.</description>
+        <description>Get the image format in which textures are exported.</description>
         <params>
         </params>
         <return>
