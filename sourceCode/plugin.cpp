@@ -11,6 +11,7 @@
 #include <cctype>
 #include <set>
 #include <limits>
+#include <memory>
 #include <simPlusPlus-2/Plugin.h>
 #include "plugin.h"
 #include "stubs.h"
@@ -101,6 +102,15 @@ struct MarkerItemTransform
     Vec3 scale = {1.0, 1.0, 1.0};
 };
 
+struct MarkerCustomMesh
+{
+    std::vector<double> vertices; // flat x,y,z per vertex
+    std::vector<int> indices;     // flat triangle list
+    std::vector<double> normals;  // flat x,y,z per vertex
+    int vertexCount = 0;
+    uint64_t meshHash = 0;
+};
+
 struct MarkerData
 {
     int type = -1;
@@ -111,12 +121,7 @@ struct MarkerData
     std::vector<float> quaternions;   // packedQuaternions: 4 floats per item
     std::vector<float> sizes;         // packedSizes: 3 floats per item
     std::vector<unsigned char> colors; // colors: 4 bytes (RGBA) per point
-    // custom markers only:
-    std::vector<double> vertices;     // 3 x N matrix, row-major
-    std::vector<int> indices;
-    std::vector<double> normals;      // 3 x N matrix, row-major
-    int vertexCount = 0;
-    uint64_t meshHash = 0;            // custom mesh identity
+    std::shared_ptr<MarkerCustomMesh> customMesh; // custom markers only
     std::vector<int64_t> ids;         // per-item ids, unique within the marker
 };
 
@@ -428,6 +433,7 @@ public:
         handleToMeshNode.clear();
         handleToChildParent.clear();
         markerStates.clear();
+        markerCustomMeshes.clear();
         markerMeshCaches.clear();
         markerGeometryCache.clear();
         markerMaterials.clear();
@@ -1076,19 +1082,28 @@ public:
         marker.ids = readMarkerLongArrayProperty(handle, "ids");
         if(marker.type == sim_markertype_custom)
         {
-            marker.vertices = readMarkerPointData(handle, "vertices");
-            marker.vertexCount = static_cast<int>(marker.vertices.size() / 3);
-            marker.indices = readMarkerIntArrayProperty(handle, "indices");
-            marker.normals = readMarkerPointData(handle, "normals");
+            auto it = markerCustomMeshes.find(handle);
+            if(it == markerCustomMeshes.end())
+            {
+                auto mesh = std::make_shared<MarkerCustomMesh>();
+                mesh->vertices = readMarkerPointData(handle, "vertices");
+                mesh->vertexCount = static_cast<int>(mesh->vertices.size() / 3);
+                mesh->indices = readMarkerIntArrayProperty(handle, "indices");
+                // Normals are per-vertex now. The builder also accepts old
+                // per-triangle-corner data as a fallback.
+                mesh->normals = readMarkerPointData(handle, "normals");
 
-            MarkerUidBuilder meshHash;
-            if(!marker.vertices.empty())
-                meshHash.addBytes(marker.vertices.data(), marker.vertices.size() * sizeof(double));
-            if(!marker.indices.empty())
-                meshHash.addBytes(marker.indices.data(), marker.indices.size() * sizeof(int));
-            if(!marker.normals.empty())
-                meshHash.addBytes(marker.normals.data(), marker.normals.size() * sizeof(double));
-            marker.meshHash = meshHash.value;
+                MarkerUidBuilder meshHash;
+                if(!mesh->vertices.empty())
+                    meshHash.addBytes(mesh->vertices.data(), mesh->vertices.size() * sizeof(double));
+                if(!mesh->indices.empty())
+                    meshHash.addBytes(mesh->indices.data(), mesh->indices.size() * sizeof(int));
+                if(!mesh->normals.empty())
+                    meshHash.addBytes(mesh->normals.data(), mesh->normals.size() * sizeof(double));
+                mesh->meshHash = meshHash.value;
+                it = markerCustomMeshes.emplace(handle, mesh).first;
+            }
+            marker.customMesh = it->second;
         }
         return marker;
     }
@@ -1455,21 +1470,24 @@ public:
                                       MarkerMeshBuilder &mesh)
     {
         mesh.mode = TINYGLTF_MODE_TRIANGLES;
-        const int vertexCount = marker.vertexCount;
-        if(vertexCount <= 0 || marker.vertices.size() < static_cast<size_t>(vertexCount) * 3)
+        if(!marker.customMesh)
+            return;
+        const MarkerCustomMesh &custom = *marker.customMesh;
+        const int vertexCount = custom.vertexCount;
+        if(vertexCount <= 0 || custom.vertices.size() < static_cast<size_t>(vertexCount) * 3)
             return;
 
-        // Vertices/normals are flat interleaved lists: x,y,z per point.
+        // Vertices/normals are flat interleaved lists: x,y,z per vertex.
         const auto vertexAt = [&](int index) -> Vec3
         {
-            return {marker.vertices[3 * index + 0],
-                    marker.vertices[3 * index + 1],
-                    marker.vertices[3 * index + 2]};
+            return {custom.vertices[3 * index + 0],
+                    custom.vertices[3 * index + 1],
+                    custom.vertices[3 * index + 2]};
         };
 
         std::vector<int> generatedIndices;
-        const std::vector<int> *indices = &marker.indices;
-        if(marker.indices.empty())
+        const std::vector<int> *indices = &custom.indices;
+        if(custom.indices.empty())
         {
             generatedIndices.resize(vertexCount);
             for(int i = 0; i < vertexCount; i++)
@@ -1478,16 +1496,20 @@ public:
         }
 
         const int indexCount = static_cast<int>(indices->size());
-        const int normalCount = static_cast<int>(marker.normals.size() / 3);
-        // Custom markers normally provide one normal per triangle corner
-        // (3 * triangle count). Accept per-vertex normals too, for older data.
-        const bool cornerNormals = normalCount == indexCount;
-        const bool vertexNormals = !cornerNormals && normalCount >= vertexCount;
+        const int normalCount = static_cast<int>(custom.normals.size() / 3);
+        // Custom markers now provide one normal per vertex. Keep accepting the
+        // older per-triangle-corner layout (3 * triangle count) as a fallback.
+        bool vertexNormals = (normalCount == vertexCount);
+        bool cornerNormals = false;
+        if(!vertexNormals && normalCount == indexCount)
+            cornerNormals = true;
+        else if(!vertexNormals && normalCount > vertexCount)
+            vertexNormals = true;
         const auto normalAt = [&](int index) -> Vec3
         {
-            return {marker.normals[3 * index + 0],
-                    marker.normals[3 * index + 1],
-                    marker.normals[3 * index + 2]};
+            return {custom.normals[3 * index + 0],
+                    custom.normals[3 * index + 1],
+                    custom.normals[3 * index + 2]};
         };
 
         for(int k = 0; k + 2 < indexCount; k += 3)
@@ -1578,8 +1600,54 @@ public:
         return markerItemTransform(marker, itemIndex, markerDefaultItemSize(marker.type));
     }
 
+    int getMarkerCustomItemMesh(_handle_t handle, const MarkerData &marker, const MarkerItemDesc &desc)
+    {
+        MarkerState &state = markerStates[handle];
+        const std::array<double, 4> color = markerColorAt(marker, desc.itemIndex);
+        const uint64_t customHash = marker.customMesh ? marker.customMesh->meshHash : 0;
+
+        if(state.customGeometry.positionAccessor < 0 || state.customGeometryHash != customHash)
+        {
+            MarkerMeshBuilder geometryMesh;
+            buildMarkerCustomUnit(marker, color, geometryMesh);
+            if(geometryMesh.positions.empty() ||
+               geometryMesh.colors.size() != geometryMesh.positions.size() / 3 * 4)
+                return -1;
+            state.customGeometry = addMarkerGeometry(geometryMesh, "marker item");
+            state.customGeometryHash = customHash;
+            state.itemMeshes.clear();
+        }
+
+        MarkerMeshKey key;
+        key.color = markerColorKey(color);
+        const bool transparent = color[3] < 1.0;
+        key.flags = (marker.notShaded ? 1 : 0) | (transparent ? 2 : 0);
+
+        auto it = state.itemMeshes.find(key);
+        if(it != state.itemMeshes.end())
+            return it->second;
+
+        std::vector<gltfFloat> colors(static_cast<size_t>(state.customGeometry.vertexCount) * 4);
+        for(int i = 0; i < state.customGeometry.vertexCount; i++)
+        {
+            colors[4 * i + 0] = static_cast<gltfFloat>(color[0]);
+            colors[4 * i + 1] = static_cast<gltfFloat>(color[1]);
+            colors[4 * i + 2] = static_cast<gltfFloat>(color[2]);
+            colors[4 * i + 3] = static_cast<gltfFloat>(color[3]);
+        }
+
+        const int colorAccessor = addMarkerColorAccessor(colors, "marker item");
+        const int material = getMarkerItemMaterial(marker.notShaded, transparent);
+        const int meshIndex = addMarkerMesh("marker item", state.customGeometry, colorAccessor, material);
+        state.itemMeshes[key] = meshIndex;
+        return meshIndex;
+    }
+
     int getMarkerItemMesh(_handle_t handle, const MarkerData &marker, const MarkerItemDesc &desc)
     {
+        if(marker.type == sim_markertype_custom)
+            return getMarkerCustomItemMesh(handle, marker, desc);
+
         MarkerMeshBuilder mesh;
         MarkerMeshKey key;
         bool transparent = false;
@@ -1627,14 +1695,6 @@ public:
             buildMarkerOnePointUnit(marker.type, color, mesh);
             break;
         }
-        case sim_markertype_custom:
-        {
-            const std::array<double, 4> color = markerColorAt(marker, itemIndex);
-            key.color = markerColorKey(color);
-            transparent = color[3] < 1.0;
-            buildMarkerCustomUnit(marker, color, mesh);
-            break;
-        }
         default:
             return -1;
         }
@@ -1644,29 +1704,12 @@ public:
 
         key.flags = (marker.notShaded ? 1 : 0) | (transparent ? 2 : 0);
 
-        MarkerGeometry geometry;
-        if(marker.type == sim_markertype_custom)
-        {
-            MarkerState &state = markerStates[handle];
-            if(state.customGeometry.positionAccessor < 0 || state.customGeometryHash != marker.meshHash)
-            {
-                state.customGeometry = addMarkerGeometry(mesh, "marker item");
-                state.customGeometryHash = marker.meshHash;
-                state.itemMeshes.clear();
-            }
-            geometry = state.customGeometry;
-        }
-        else
-        {
-            MarkerGeometry &cached = markerGeometryCache[markerGeometryType(marker.type)];
-            if(cached.positionAccessor < 0)
-                cached = addMarkerGeometry(mesh, "marker item");
-            geometry = cached;
-        }
+        MarkerGeometry &cached = markerGeometryCache[markerGeometryType(marker.type)];
+        if(cached.positionAccessor < 0)
+            cached = addMarkerGeometry(mesh, "marker item");
+        const MarkerGeometry geometry = cached;
 
-        auto &cache = (marker.type == sim_markertype_custom)
-                          ? markerStates[handle].itemMeshes
-                          : markerMeshCaches[marker.type];
+        auto &cache = markerMeshCaches[marker.type];
         auto it = cache.find(key);
         if(it != cache.end())
             return it->second;
@@ -2215,6 +2258,7 @@ private:
     std::map<_handle_t, int> handleToMeshNode;
     std::map<_handle_t, int> handleToChildParent; // where to attach children (joints)
     std::map<_handle_t, MarkerState> markerStates; // marker items, keyed by marker handle
+    std::map<_handle_t, std::shared_ptr<MarkerCustomMesh>> markerCustomMeshes; // read once per marker
     std::map<int, std::map<MarkerMeshKey, int>> markerMeshCaches; // marker type -> item mesh
     std::map<int, MarkerGeometry> markerGeometryCache; // marker type -> shared unit geometry
     std::map<int, int> markerMaterials; // (notShaded | transparent << 1) -> material
