@@ -386,6 +386,16 @@ public:
         return objType == "marker";
     }
 
+    bool isPointCloud(_handle_t handle)
+    {
+        return simGetObjectType(handle) == sim_sceneobject_pointcloud;
+    }
+
+    bool isOctree(_handle_t handle)
+    {
+        return simGetObjectType(handle) == sim_sceneobject_octree;
+    }
+
     std::vector<_handle_t> ungroupShapeCopy(_handle_t handle)
     {
         auto handles = sim::copyPasteObjects({handle}, 0);
@@ -397,7 +407,9 @@ public:
         p->handle = handle;
         p->position = sim::getObjectPosition(handle, relTo);
         p->orientation = sim::getObjectQuaternion(handle, relTo);
-        p->visible = !(isShape(handle) || isMarker(handle)) || (isVisible(handle) && !isWireframe(handle));
+        p->visible = !(isShape(handle) || isMarker(handle) ||
+                       isPointCloud(handle) || isOctree(handle)) ||
+                     (isVisible(handle) && !isWireframe(handle));
     }
 
     std::string buf2str(const void *data, size_t size)
@@ -1290,6 +1302,27 @@ public:
                            colors.size() / 4, cmin, cmax, name + " marker color");
     }
 
+    int addMarkerVecAccessor(const std::vector<gltfFloat> &values, int components, const std::string &name)
+    {
+        int b = addBuffer(values.data(), sizeof(gltfFloat) * values.size(), name + " marker vector");
+        int v = addBufferView(b, sizeof(gltfFloat) * values.size(), 0, name + " marker vector");
+        std::vector<double> vmin, vmax;
+        minMaxVec(values, components, vmin, vmax);
+        return addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_gltfFloat,
+                           components == 4 ? TINYGLTF_TYPE_VEC4 : TINYGLTF_TYPE_VEC3,
+                           values.size() / components, vmin, vmax, name + " marker vector");
+    }
+
+    int addMarkerIndexAccessor(const std::vector<unsigned int> &indices, const std::string &name)
+    {
+        int b = addBuffer(indices.data(), sizeof(unsigned int) * indices.size(), name + " marker index");
+        int v = addBufferView(b, sizeof(unsigned int) * indices.size(), 0, name + " marker index");
+        std::vector<double> imin, imax;
+        minMaxVec(indices, 1, imin, imax);
+        return addAccessor(v, 0, TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT, TINYGLTF_TYPE_SCALAR,
+                           indices.size(), imin, imax, name + " marker index");
+    }
+
     int addMarkerMesh(const std::string &name, const MarkerGeometry &geometry, int colorAccessor, int material)
     {
         int mesh = model.meshes.size();
@@ -1302,6 +1335,172 @@ public:
         model.meshes[mesh].primitives[0].mode = geometry.mode;
         model.meshes[mesh].primitives[0].material = material;
         return mesh;
+    }
+
+    void exportPointCloudContent(_handle_t obj, int nodeIndex)
+    {
+        const std::vector<float> packed = unpackFloats(readMarkerBufferProperty(obj, "packedPoints"));
+        if(packed.size() < 3)
+            return;
+
+        const int pointCount = static_cast<int>(packed.size() / 3);
+        const std::vector<unsigned char> colorBytes = readMarkerBufferProperty(obj, "colors");
+        std::vector<gltfFloat> positions(static_cast<size_t>(pointCount) * 3);
+        std::vector<gltfFloat> colors(static_cast<size_t>(pointCount) * 4, 1.0f);
+        bool transparent = false;
+        for(int i = 0; i < pointCount; i++)
+        {
+            positions[3 * i + 0] = packed[3 * i + 0];
+            positions[3 * i + 1] = packed[3 * i + 1];
+            positions[3 * i + 2] = packed[3 * i + 2];
+
+            const size_t base = static_cast<size_t>(i) * 4;
+            if(base + 4 <= colorBytes.size())
+            {
+                for(int k = 0; k < 4; k++)
+                    colors[base + k] = static_cast<gltfFloat>(colorBytes[base + k] / 255.0);
+                if(colorBytes[base + 3] < 255)
+                    transparent = true;
+            }
+        }
+
+        const int positionAccessor = addMarkerVecAccessor(positions, 3, "point cloud");
+        const int colorAccessor = addMarkerColorAccessor(colors, "point cloud");
+        const int material = getMarkerItemMaterial(true, transparent);
+
+        const int mesh = model.meshes.size();
+        model.meshes.push_back({});
+        model.meshes[mesh].name = getObjectName(obj) + " point cloud mesh";
+        model.meshes[mesh].primitives.push_back({});
+        model.meshes[mesh].primitives[0].attributes["POSITION"] = positionAccessor;
+        model.meshes[mesh].primitives[0].attributes["COLOR_0"] = colorAccessor;
+        model.meshes[mesh].primitives[0].mode = TINYGLTF_MODE_POINTS;
+        model.meshes[mesh].primitives[0].material = material;
+        model.nodes[nodeIndex].mesh = mesh;
+
+        int pointSize = 0;
+        if(simGetIntProperty(obj, "pointSize", &pointSize) != sim_propertyret_ok)
+        {
+            sim::clearLastError();
+            pointSize = 0;
+        }
+        tinygltf::Value::Object extras;
+        extras["objectType"] = tinygltf::Value(std::string("pointCloud"));
+        extras["pointSize"] = tinygltf::Value(pointSize);
+        model.nodes[nodeIndex].extras = tinygltf::Value(std::move(extras));
+    }
+
+    void exportOctreeContent(_handle_t obj, int nodeIndex)
+    {
+        const std::vector<float> packed = unpackFloats(readMarkerBufferProperty(obj, "packedPoints"));
+        if(packed.size() < 3)
+            return;
+
+        double voxelSize = 0.0;
+        if(simGetFloatProperty(obj, "voxelSize", &voxelSize) != sim_propertyret_ok)
+        {
+            sim::clearLastError();
+            voxelSize = 0.025;
+        }
+        if(!(voxelSize > 0.0))
+            voxelSize = 0.025;
+
+        const int voxelCount = static_cast<int>(packed.size() / 3);
+        const std::vector<unsigned char> colorBytes = readMarkerBufferProperty(obj, "colors");
+        const double half = voxelSize * 0.5;
+
+        // Unit cube corners, then the six outward-facing quads.
+        const Vec3 corners[8] = {
+            {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
+            {-1, -1, 1},  {1, -1, 1},  {1, 1, 1},  {-1, 1, 1}};
+        const int faceCorners[6][4] = {
+            {0, 3, 2, 1}, {4, 5, 6, 7}, {0, 1, 5, 4},
+            {3, 7, 6, 2}, {0, 4, 7, 3}, {1, 2, 6, 5}};
+        const Vec3 faceNormals[6] = {
+            {0, 0, -1}, {0, 0, 1}, {0, -1, 0},
+            {0, 1, 0}, {-1, 0, 0}, {1, 0, 0}};
+
+        std::vector<gltfFloat> positions;
+        std::vector<gltfFloat> normals;
+        std::vector<gltfFloat> colors;
+        std::vector<unsigned int> indices;
+        positions.reserve(static_cast<size_t>(voxelCount) * 24 * 3);
+        normals.reserve(static_cast<size_t>(voxelCount) * 24 * 3);
+        colors.reserve(static_cast<size_t>(voxelCount) * 24 * 4);
+        indices.reserve(static_cast<size_t>(voxelCount) * 36);
+
+        bool transparent = false;
+        for(int i = 0; i < voxelCount; i++)
+        {
+            const Vec3 center{packed[3 * i + 0], packed[3 * i + 1], packed[3 * i + 2]};
+            std::array<gltfFloat, 4> color = {1.0f, 1.0f, 1.0f, 1.0f};
+            const size_t cbase = static_cast<size_t>(i) * 4;
+            if(cbase + 4 <= colorBytes.size())
+            {
+                for(int k = 0; k < 4; k++)
+                    color[k] = static_cast<gltfFloat>(colorBytes[cbase + k] / 255.0);
+                if(colorBytes[cbase + 3] < 255)
+                    transparent = true;
+            }
+
+            for(int f = 0; f < 6; f++)
+            {
+                const unsigned int base = static_cast<unsigned int>(positions.size() / 3);
+                for(int j = 0; j < 4; j++)
+                {
+                    const Vec3 c = corners[faceCorners[f][j]];
+                    positions.push_back(static_cast<gltfFloat>(center.x + c.x * half));
+                    positions.push_back(static_cast<gltfFloat>(center.y + c.y * half));
+                    positions.push_back(static_cast<gltfFloat>(center.z + c.z * half));
+                    normals.push_back(static_cast<gltfFloat>(faceNormals[f].x));
+                    normals.push_back(static_cast<gltfFloat>(faceNormals[f].y));
+                    normals.push_back(static_cast<gltfFloat>(faceNormals[f].z));
+                    for(int k = 0; k < 4; k++)
+                        colors.push_back(color[k]);
+                }
+                indices.push_back(base + 0);
+                indices.push_back(base + 1);
+                indices.push_back(base + 2);
+                indices.push_back(base + 0);
+                indices.push_back(base + 2);
+                indices.push_back(base + 3);
+            }
+        }
+
+        if(positions.empty())
+            return;
+
+        const int positionAccessor = addMarkerVecAccessor(positions, 3, "oc-tree");
+        const int normalAccessor = addMarkerVecAccessor(normals, 3, "oc-tree");
+        const int colorAccessor = addMarkerColorAccessor(colors, "oc-tree");
+        const int indexAccessor = addMarkerIndexAccessor(indices, "oc-tree");
+        // Oc-tree cubes are shaded, unlike the unlit point-cloud points.
+        const int material = getMarkerItemMaterial(false, transparent);
+
+        const int mesh = model.meshes.size();
+        model.meshes.push_back({});
+        model.meshes[mesh].name = getObjectName(obj) + " oc-tree mesh";
+        model.meshes[mesh].primitives.push_back({});
+        model.meshes[mesh].primitives[0].attributes["POSITION"] = positionAccessor;
+        model.meshes[mesh].primitives[0].attributes["NORMAL"] = normalAccessor;
+        model.meshes[mesh].primitives[0].attributes["COLOR_0"] = colorAccessor;
+        model.meshes[mesh].primitives[0].indices = indexAccessor;
+        model.meshes[mesh].primitives[0].mode = TINYGLTF_MODE_TRIANGLES;
+        model.meshes[mesh].primitives[0].material = material;
+        model.nodes[nodeIndex].mesh = mesh;
+
+        tinygltf::Value::Object extras;
+        extras["objectType"] = tinygltf::Value(std::string("ocTree"));
+        extras["voxelSize"] = tinygltf::Value(voxelSize);
+        model.nodes[nodeIndex].extras = tinygltf::Value(std::move(extras));
+    }
+
+    void exportPointCloudOrOctreeContent(_handle_t obj, int nodeIndex)
+    {
+        if(isPointCloud(obj))
+            exportPointCloudContent(obj, nodeIndex);
+        else if(isOctree(obj))
+            exportOctreeContent(obj, nodeIndex);
     }
 
     static void buildMarkerPointUnit(const std::array<double, 4> &color, MarkerMeshBuilder &mesh)
@@ -1866,12 +2065,33 @@ public:
     {
         for(_handle_t obj : getAllObjects())
             ensureNode(obj);
+        // Point clouds and oc-trees are fetched separately, after the shapes.
+        for(_handle_t obj : getPointCloudAndOctreeObjects())
+            ensureNode(obj);
     }
 
     void exportSelectedObjects(exportSelectedObjects_in *in, exportSelectedObjects_out *out)
     {
         for(_handle_t h : sim::getHandleArrayProperty(sim_handle_scene, "selection"))
             ensureNode(static_cast<int>(h));
+    }
+
+    std::vector<_handle_t> getPointCloudAndOctreeObjects()
+    {
+        std::vector<_handle_t> result;
+        const int types[2] = {sim_sceneobject_pointcloud, sim_sceneobject_octree};
+        for(int type : types)
+        {
+            for(int index = 0;; index++)
+            {
+                const SIMHANDLE handle = simGetObjects(index, type);
+                if(handle < 0)
+                    break;
+                if(isVisible(static_cast<_handle_t>(handle)))
+                    result.push_back(static_cast<_handle_t>(handle));
+            }
+        }
+        return result;
     }
 
     std::vector<_handle_t> getAllObjects()
@@ -2187,6 +2407,8 @@ public:
         // (and their ancestors — ensureNode recurses).
         for(_handle_t handle : getAllObjects())
             ensureNode(handle);
+        for(_handle_t handle : getPointCloudAndOctreeObjects())
+            ensureNode(handle);
 
         // Record local poses for *every* node we know about, so that
         // dummy nodes (joints, sensors, invisible parents) are animated too.
@@ -2343,6 +2565,9 @@ private:
             if(isMarker(handle) && isVisible(handle) &&
                markerStates.find(handle) == markerStates.end())
                 exportMarkerContent(handle, it->second);
+            if((isPointCloud(handle) || isOctree(handle)) && isVisible(handle) &&
+               model.nodes[it->second].mesh < 0)
+                exportPointCloudOrOctreeContent(handle, it->second);
             return it->second;
         }
 
@@ -2365,6 +2590,15 @@ private:
         model.nodes[parentNodeIndex].children.push_back(nodeIndex);
         model.nodes[nodeIndex].name = getObjectName(handle);
         getGLTFPose(handle, parentHandle, model.nodes[nodeIndex]);
+        if((isPointCloud(handle) || isOctree(handle)) && parentHandle == -1)
+        {
+            double pose[7];
+            if(simGetObjectPose(handle, -1, pose) > 0)
+            {
+                model.nodes[nodeIndex].translation = {pose[0], pose[1], pose[2]};
+                model.nodes[nodeIndex].rotation = {pose[3], pose[4], pose[5], pose[6]};
+            }
+        }
 
         handleToNode[handle] = nodeIndex;
 
@@ -2383,6 +2617,8 @@ private:
             exportShapeContent(handle, nodeIndex);
         else if(isMarker(handle) && isVisible(handle))
             exportMarkerContent(handle, nodeIndex);
+        else if((isPointCloud(handle) || isOctree(handle)) && isVisible(handle))
+            exportPointCloudOrOctreeContent(handle, nodeIndex);
         else if(isCamera(handle))
             exportCameraContent(handle, nodeIndex);
         else if(isLight(handle))
