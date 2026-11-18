@@ -1075,8 +1075,6 @@ public:
         if(type == "cubes")      return sim_markertype_cubes;
         if(type == "cylinders")  return sim_markertype_cylinders;
         if(type == "custom")     return sim_markertype_custom;
-        if(type == "tubes")      return sim_markertype_tubes;
-        if(type == "axes")       return sim_markertype_axes;
         return -1;
     }
 
@@ -1182,28 +1180,25 @@ public:
 
     static int markerPointsPerItem(int type)
     {
-        if(type == sim_markertype_lines || type == sim_markertype_tubes)
+        if(type == sim_markertype_lines)
             return 2;
         if(type == sim_markertype_triangles)
             return 3;
         return 1;
     }
 
-    // Points and spheres share the unit-sphere geometry; lines and tubes share
-    // the unit-tube geometry.
+    // Points and spheres share the unit-sphere geometry.
     static int markerGeometryType(int type)
     {
         if(type == sim_markertype_points)
             return sim_markertype_spheres;
-        if(type == sim_markertype_lines)
-            return sim_markertype_tubes;
         return type;
     }
 
     static double markerDefaultItemSize(int type)
     {
-        // Custom items always carry explicit sizes; axes too in practice, but
-        // fall back to the marker's default item size.
+        // Custom items always carry explicit sizes; fall back to the marker's
+        // default item size.
         return (type == sim_markertype_custom) ? 1.0 : 0.005;
     }
 
@@ -1551,23 +1546,6 @@ public:
         }
     }
 
-    static void buildMarkerAxesUnit(MarkerMeshBuilder &mesh)
-    {
-        mesh.mode = TINYGLTF_MODE_LINE;
-        const std::array<double, 4> red = {1.0, 0.0, 0.0, 1.0};
-        const std::array<double, 4> green = {0.0, 1.0, 0.0, 1.0};
-        const std::array<double, 4> blue = {0.0, 0.0, 1.0, 1.0};
-        const Vec3 origin{0.0, 0.0, 0.0};
-        const Vec3 normal{0.0, 0.0, 1.0};
-
-        mesh.add(origin, normal, red);
-        mesh.add({1.0, 0.0, 0.0}, normal, red);
-        mesh.add(origin, normal, green);
-        mesh.add({0.0, 1.0, 0.0}, normal, green);
-        mesh.add(origin, normal, blue);
-        mesh.add({0.0, 0.0, 1.0}, normal, blue);
-    }
-
     static void buildMarkerOnePointUnit(int type, const std::array<double, 4> &color,
                                         MarkerMeshBuilder &mesh)
     {
@@ -1769,7 +1747,7 @@ public:
             return transform;
         }
 
-        if(marker.type == sim_markertype_lines || marker.type == sim_markertype_tubes)
+        if(marker.type == sim_markertype_lines)
         {
             const int p0Index = itemIndex * 2;
             const int p1Index = p0Index + 1;
@@ -1782,17 +1760,8 @@ public:
             if(len > 1e-12)
                 transform.orientation = markerRotationFromZ(axis * (1.0 / len));
 
-            if(marker.type == sim_markertype_tubes)
-            {
-                // Only the first size value is used, as the tube diameter.
-                const double diameter = marker.sizes.empty() ? 0.005 : marker.sizes[0];
-                transform.scale = {diameter, diameter, len};
-            }
-            else
-            {
-                // Lines are rendered as tubes with radius 0.0025 (diameter 0.005).
-                transform.scale = {0.005, 0.005, len};
-            }
+            // Lines are rendered as tubes with radius 0.0025 (diameter 0.005).
+            transform.scale = {0.005, 0.005, len};
             return transform;
         }
 
@@ -1871,17 +1840,6 @@ public:
             buildMarkerLineUnit(c0, c1, mesh);
             break;
         }
-        case sim_markertype_tubes:
-        {
-            const std::array<double, 4> color = markerColorAt(marker, itemIndex * 2);
-            key.color = markerColorKey(color);
-            transparent = color[3] < 1.0;
-            buildMarkerTubeUnit(color, mesh);
-            break;
-        }
-        case sim_markertype_axes:
-            buildMarkerAxesUnit(mesh);
-            break;
         case sim_markertype_squares:
         case sim_markertype_discs:
         case sim_markertype_spheres:
